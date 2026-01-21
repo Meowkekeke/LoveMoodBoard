@@ -1,4 +1,4 @@
-import { doc, setDoc, getDoc, updateDoc, onSnapshot, Unsubscribe, arrayUnion } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, onSnapshot, Unsubscribe, arrayUnion, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { RoomData, Mood, UserState, InteractionType, MoodEntry } from '../types';
 
@@ -18,6 +18,7 @@ const initialUserState: UserState = {
   name: 'Anonymous',
   mood: Mood.HAPPY,
   note: 'Just joined!',
+  socialBattery: 80,
   lastUpdated: Date.now(),
 };
 
@@ -69,25 +70,38 @@ export const joinRoom = async (code: string, userId: string, userName: string): 
   return true;
 };
 
-export const subscribeToRoom = (code: string, callback: (data: RoomData) => void): Unsubscribe => {
+// Updated to allow returning null if document is deleted
+export const subscribeToRoom = (code: string, callback: (data: RoomData | null) => void): Unsubscribe => {
   return onSnapshot(doc(db, ROOM_COLLECTION, code), (snapshot) => {
     if (snapshot.exists()) {
       callback(snapshot.data() as RoomData);
+    } else {
+      callback(null); // Document deleted
     }
   });
 };
 
-export const logMood = async (code: string, userId: string, userName: string, mood: Mood, note: string) => {
+export const logMood = async (code: string, userId: string, userName: string, mood: Mood | null, note: string, actionConfig?: { category: 'self_care'|'rough'|'needs', icon: string }) => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
   
+  // Create object with only defined values to avoid Firestore "Unsupported field value: undefined" error
   const newEntry: MoodEntry = {
     id: crypto.randomUUID(),
     userId,
     userName,
-    mood,
+    type: actionConfig ? 'action' : 'mood',
     note,
     timestamp: Date.now()
   };
+
+  if (mood) {
+    newEntry.mood = mood;
+  }
+
+  if (actionConfig) {
+    newEntry.category = actionConfig.category;
+    newEntry.icon = actionConfig.icon;
+  }
 
   // We add to logs AND update the current state for backward compatibility/profile view
   const roomSnap = await getDoc(roomRef);
@@ -96,12 +110,32 @@ export const logMood = async (code: string, userId: string, userName: string, mo
   const isHost = data.hostId === userId;
   const fieldPrefix = isHost ? 'hostState' : 'guestState';
 
-  await updateDoc(roomRef, {
+  const updates: any = {
     logs: arrayUnion(newEntry),
-    [`${fieldPrefix}.mood`]: mood,
-    [`${fieldPrefix}.note`]: note,
     [`${fieldPrefix}.lastUpdated`]: Date.now()
-  });
+  };
+
+  // Only update current mood state if it's a mood entry
+  if (!actionConfig && mood) {
+      updates[`${fieldPrefix}.mood`] = mood;
+      updates[`${fieldPrefix}.note`] = note;
+  }
+
+  await updateDoc(roomRef, updates);
+};
+
+export const updateSocialBattery = async (code: string, userId: string, level: number) => {
+    const roomRef = doc(db, ROOM_COLLECTION, code);
+    const roomSnap = await getDoc(roomRef);
+    if (!roomSnap.exists()) return;
+    const data = roomSnap.data() as RoomData;
+    const isHost = data.hostId === userId;
+    const fieldPrefix = isHost ? 'hostState' : 'guestState';
+
+    await updateDoc(roomRef, {
+        [`${fieldPrefix}.socialBattery`]: level,
+        [`${fieldPrefix}.lastUpdated`]: Date.now()
+    });
 };
 
 export const sendInteraction = async (code: string, userId: string, type: InteractionType) => {
@@ -113,4 +147,40 @@ export const sendInteraction = async (code: string, userId: string, type: Intera
       timestamp: Date.now()
     }
   });
+};
+
+export const clearUserLogs = async (code: string, userId: string) => {
+  const roomRef = doc(db, ROOM_COLLECTION, code);
+  const snap = await getDoc(roomRef);
+  
+  if (snap.exists()) {
+    const data = snap.data() as RoomData;
+    const isHost = data.hostId === userId;
+    const isGuest = data.guestId === userId;
+
+    // Filter out logs that belong to this user
+    const newLogs = (data.logs || []).filter(log => log.userId !== userId);
+    
+    const updates: any = {
+      logs: newLogs
+    };
+
+    // Also reset current state to give immediate visual feedback
+    if (isHost) {
+      updates['hostState.mood'] = Mood.HAPPY;
+      updates['hostState.note'] = 'Memories cleared ✨';
+      updates['hostState.lastUpdated'] = Date.now();
+    } else if (isGuest) {
+      updates['guestState.mood'] = Mood.HAPPY;
+      updates['guestState.note'] = 'Memories cleared ✨';
+      updates['guestState.lastUpdated'] = Date.now();
+    }
+
+    await updateDoc(roomRef, updates);
+  }
+};
+
+export const deleteRoom = async (code: string) => {
+  const roomRef = doc(db, ROOM_COLLECTION, code);
+  await deleteDoc(roomRef);
 };

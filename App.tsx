@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus } from 'lucide-react';
-import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction } from './services/db';
+import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X } from 'lucide-react';
+import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, updateSocialBattery, clearUserLogs, deleteRoom } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
 import { MoodEditor } from './components/MoodEditor';
 import { DoodleButton } from './components/DoodleButton';
 import { InteractionBar } from './components/InteractionBar';
+import { SocialBattery } from './components/SocialBattery';
+import { ActionPanel } from './components/ActionPanel';
 
 // Utility for persistent User ID
 const getUserId = () => {
@@ -31,6 +33,7 @@ const App: React.FC = () => {
   const [error, setError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [showNameModal, setShowNameModal] = useState(!localStorage.getItem('lovesync_name'));
+  const [showSettings, setShowSettings] = useState(false);
   
   // Animation State
   const [animationType, setAnimationType] = useState<InteractionType | null>(null);
@@ -41,6 +44,16 @@ const App: React.FC = () => {
     if (!roomCode) return;
 
     const unsubscribe = subscribeToRoom(roomCode, (data) => {
+      if (!data) {
+        // Room was deleted
+        localStorage.removeItem('lovesync_code');
+        setRoomCode(null);
+        setRoomData(null);
+        setShowSettings(false);
+        setError('The garden was destroyed.');
+        return;
+      }
+
       setRoomData(data);
 
       // Handle Interactions
@@ -124,6 +137,24 @@ const App: React.FC = () => {
     }
   };
 
+  const handleActionLog = async (category: 'self_care'|'rough'|'needs', icon: string, label: string) => {
+    if (!roomCode) return;
+    try {
+      await logMood(roomCode, userId, userName, null, label, { category, icon });
+    } catch (err) {
+      console.error("Failed to log action", err);
+    }
+  };
+
+  const handleBatteryUpdate = async (level: number) => {
+    if (!roomCode) return;
+    try {
+      await updateSocialBattery(roomCode, userId, level);
+    } catch (err) {
+      console.error("Failed battery update", err);
+    }
+  };
+
   const handleInteraction = async (type: InteractionType) => {
       if (!roomCode) return;
       try {
@@ -133,11 +164,37 @@ const App: React.FC = () => {
       }
   };
 
-  const handleLeaveRoom = () => {
-    if(confirm("Are you sure you want to disconnect? You'll need the code to join again.")) {
+  const handleDisconnect = () => {
+    if(confirm("Just leaving for now? You can re-join with the code.")) {
       localStorage.removeItem('lovesync_code');
       setRoomCode(null);
       setRoomData(null);
+      setShowSettings(false);
+    }
+  };
+
+  const handleClearMemory = async () => {
+    if (!roomCode) return;
+    if (confirm("Are you sure? This will delete all YOUR notes from the garden forever.")) {
+      try {
+        await clearUserLogs(roomCode, userId);
+        setShowSettings(false);
+      } catch (err) {
+        alert("Failed to clear memory.");
+      }
+    }
+  };
+
+  const handleDestroyGarden = async () => {
+    if (!roomCode) return;
+    const confirmation = prompt("This will DELETE the entire room for both of you. Type 'DELETE' to confirm.");
+    if (confirmation === 'DELETE') {
+      try {
+        await deleteRoom(roomCode);
+        // Subscription will handle the cleanup via null data
+      } catch (err) {
+        alert("Failed to destroy garden.");
+      }
     }
   };
 
@@ -287,10 +344,17 @@ const App: React.FC = () => {
     );
   }
 
-  // Derived Data for Log View
-  const logs = roomData.logs || []; // Fallback for old rooms
-  const sortedLogs = [...logs].sort((a, b) => b.timestamp - a.timestamp);
+  // Derived Data
+  const isHost = roomData.hostId === userId;
+  const myState = isHost ? roomData.hostState : roomData.guestState;
+  const partnerState = isHost ? roomData.guestState : roomData.hostState;
   
+  // Use Partner Name if joined, otherwise default to "Partner"
+  const partnerTabLabel = (isHost && !roomData.guestId) ? 'Partner' : partnerState.name;
+  const isPartnerJoined = !!roomData.guestId;
+
+  const logs = roomData.logs || []; 
+  const sortedLogs = [...logs].sort((a, b) => b.timestamp - a.timestamp);
   const myLogs = sortedLogs.filter(l => l.userId === userId);
   const partnerLogs = sortedLogs.filter(l => l.userId !== userId);
 
@@ -309,15 +373,19 @@ const App: React.FC = () => {
         </div>
         
         <div className="flex items-center gap-2">
-          <button 
-            onClick={copyCode}
-            className="flex items-center gap-1 px-3 py-1.5 bg-[#fde047] hover:bg-[#facc15] border-2 border-black rounded-lg text-xs font-bold transition-all active:scale-95 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-          >
-            <span className="font-mono">{roomCode}</span>
-            <Copy size={12} />
-          </button>
-          <button onClick={handleLeaveRoom} className="p-2 bg-white hover:bg-red-100 border-2 border-black rounded-lg text-black transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
-            <LogOut size={16} />
+          {/* Only show code if partner hasn't joined */}
+          {!isPartnerJoined && (
+            <button 
+                onClick={copyCode}
+                className="flex items-center gap-1 px-3 py-1.5 bg-[#fde047] hover:bg-[#facc15] border-2 border-black rounded-lg text-xs font-bold transition-all active:scale-95 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+            >
+                <span className="font-mono">{roomCode}</span>
+                <Copy size={12} />
+            </button>
+          )}
+
+          <button onClick={() => setShowSettings(true)} className="p-2 bg-white hover:bg-gray-100 border-2 border-black rounded-lg text-black transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+            <Settings size={18} />
           </button>
         </div>
       </header>
@@ -326,80 +394,111 @@ const App: React.FC = () => {
       <nav className="relative z-20 flex gap-2 mb-4">
         <button 
           onClick={() => setActiveTab('me')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all min-w-0 ${
             activeTab === 'me' 
               ? 'bg-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]' 
               : 'bg-black/5 border-transparent text-gray-500 hover:bg-black/10'
           }`}
         >
-          <User size={20} />
-          My Log
+          <User size={20} className="shrink-0" />
+          Me
         </button>
         <button 
           onClick={() => setActiveTab('partner')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all ${
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all min-w-0 ${
             activeTab === 'partner' 
               ? 'bg-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]' 
               : 'bg-black/5 border-transparent text-gray-500 hover:bg-black/10'
           }`}
         >
-          <Users size={20} />
-          Partner Log
+          <Users size={20} className="shrink-0" />
+          <span className="truncate">{partnerTabLabel}</span>
         </button>
       </nav>
 
-      {/* Main Content Area: List View */}
-      <main className="flex-1 flex flex-col gap-4 relative z-10 pb-24 overflow-y-auto">
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col relative z-10 pb-6 min-h-0">
         
         {/* Me Tab */}
         {activeTab === 'me' && (
-          <section className="animate-in fade-in slide-in-from-left-4 duration-300 space-y-4">
-            {myLogs.length === 0 ? (
-               <div className="text-center py-10 opacity-60">
-                  <p className="font-bold text-xl">No notes yet!</p>
-                  <p>Click + to add one.</p>
-               </div>
-            ) : (
-                myLogs.map(log => (
-                    <MoodCard 
-                        key={log.id} 
-                        data={{
-                            name: log.userName,
-                            mood: log.mood,
-                            note: log.note,
-                            timestamp: log.timestamp
-                        }}
-                        isMe={true}
-                    />
-                ))
-            )}
+          <section className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-300">
+             
+             {/* 1. Status Section */}
+             <div className="mb-4">
+               <SocialBattery 
+                 level={myState.socialBattery || 80} 
+                 onUpdate={handleBatteryUpdate} 
+               />
+             </div>
+
+             {/* 2. Logs Feed (Scrollable) */}
+             <div className="flex-1 overflow-y-auto min-h-[200px] mb-4 space-y-4 px-1">
+                {myLogs.length === 0 ? (
+                  <div className="text-center py-10 opacity-60">
+                      <p className="font-bold text-xl">No notes yet!</p>
+                  </div>
+                ) : (
+                    myLogs.map(log => (
+                        <MoodCard 
+                            key={log.id} 
+                            data={{
+                                name: log.userName,
+                                type: log.type,
+                                mood: log.mood,
+                                category: log.category,
+                                icon: log.icon,
+                                note: log.note,
+                                timestamp: log.timestamp
+                            }}
+                            isMe={true}
+                        />
+                    ))
+                )}
+             </div>
+
+             {/* 3. Actions Panel (Sticky Bottom) */}
+             <ActionPanel onLogAction={handleActionLog} />
           </section>
         )}
 
         {/* Partner Tab */}
         {activeTab === 'partner' && (
-          <section className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-4">
+          <section className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
              {roomData.guestId ? (
                 <>
-                  <InteractionBar onInteract={handleInteraction} disabled={false} />
-                  {partnerLogs.length === 0 ? (
-                     <div className="text-center py-10 opacity-60">
-                        <p className="font-bold text-xl">Partner hasn't posted yet.</p>
+                  <div className="mb-4">
+                     <SocialBattery 
+                        level={partnerState.socialBattery || 80} 
+                        readOnly={true}
+                     />
+                     <div className="mt-2">
+                         <InteractionBar onInteract={handleInteraction} disabled={false} />
                      </div>
-                  ) : (
-                      partnerLogs.map(log => (
-                        <MoodCard 
-                            key={log.id} 
-                            data={{
-                                name: log.userName,
-                                mood: log.mood,
-                                note: log.note,
-                                timestamp: log.timestamp
-                            }}
-                            isMe={false}
-                        />
-                      ))
-                  )}
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto px-1 space-y-4">
+                    {partnerLogs.length === 0 ? (
+                        <div className="text-center py-10 opacity-60">
+                            <p className="font-bold text-xl">Partner hasn't posted yet.</p>
+                        </div>
+                    ) : (
+                        partnerLogs.map(log => (
+                            <MoodCard 
+                                key={log.id} 
+                                data={{
+                                    name: log.userName,
+                                    type: log.type,
+                                    mood: log.mood,
+                                    category: log.category,
+                                    icon: log.icon,
+                                    note: log.note,
+                                    timestamp: log.timestamp
+                                }}
+                                isMe={false}
+                            />
+                        ))
+                    )}
+                  </div>
                 </>
              ) : (
                 <div className="bg-white p-8 rounded-3xl border-4 border-black border-dashed text-center">
@@ -413,24 +512,79 @@ const App: React.FC = () => {
 
       </main>
 
-      {/* Floating Action Button (Only on 'me' tab or always?) -> Always visible for quick add */}
-      <div className="fixed bottom-6 right-6 z-30">
-        <button 
-            onClick={() => setIsEditing(true)}
-            className="w-16 h-16 bg-[#fde047] border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:bg-[#facc15] active:translate-y-1 active:shadow-none transition-all"
-        >
-            <Plus size={32} strokeWidth={3} />
-        </button>
-      </div>
+      {/* Floating Action Button for Text Mood */}
+      {activeTab === 'me' && (
+          <div className="fixed bottom-6 right-6 z-40">
+            <button 
+                onClick={() => setIsEditing(true)}
+                className="w-16 h-16 bg-[#fde047] border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:bg-[#facc15] active:translate-y-1 active:shadow-none transition-all"
+            >
+                <Plus size={32} strokeWidth={3} />
+            </button>
+          </div>
+      )}
 
       {/* Editor Modal */}
       {isEditing && (
         <MoodEditor 
-          currentMood={Mood.HAPPY} // Default for new entry
+          currentMood={Mood.HAPPY} 
           currentNote=""
           onSave={handleAddLog}
           onCancel={() => setIsEditing(false)}
         />
+      )}
+
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+           <div className="bg-white w-full max-w-sm rounded-[2.5rem] border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-6 relative">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold">Garden Settings</h2>
+                <button 
+                  onClick={() => setShowSettings(false)}
+                  className="p-2 bg-gray-100 border-2 border-black rounded-full hover:bg-gray-200 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <button 
+                  onClick={handleDisconnect}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 border-4 border-gray-200 rounded-2xl hover:bg-gray-100 transition-colors group"
+                >
+                  <span className="font-bold text-gray-600">Disconnect Device</span>
+                  <LogOut className="text-gray-400 group-hover:text-black" />
+                </button>
+
+                <button 
+                  onClick={handleClearMemory}
+                  className="w-full flex items-center justify-between p-4 bg-yellow-50 border-4 border-yellow-200 rounded-2xl hover:bg-yellow-100 transition-colors group"
+                >
+                   <div className="text-left">
+                     <span className="font-bold text-yellow-800 block">Clear Memories</span>
+                     <span className="text-xs font-bold text-yellow-600">Delete my notes</span>
+                   </div>
+                   <Eraser className="text-yellow-600 group-hover:text-yellow-800" />
+                </button>
+
+                <button 
+                  onClick={handleDestroyGarden}
+                  className="w-full flex items-center justify-between p-4 bg-red-50 border-4 border-red-200 rounded-2xl hover:bg-red-100 transition-colors group"
+                >
+                   <div className="text-left">
+                     <span className="font-bold text-red-800 block">Destroy Garden</span>
+                     <span className="text-xs font-bold text-red-600">Delete everything & Exit</span>
+                   </div>
+                   <Trash2 className="text-red-600 group-hover:text-red-800" />
+                </button>
+              </div>
+
+              <div className="mt-6 text-center">
+                 <p className="text-xs text-gray-400 font-bold">LoveSync v1.0</p>
+              </div>
+           </div>
+        </div>
       )}
     </div>
   );
