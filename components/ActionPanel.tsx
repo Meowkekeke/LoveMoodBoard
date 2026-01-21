@@ -42,7 +42,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({ onLogAction }) => {
   const config = ACTION_CATEGORIES[activeTab];
 
   return (
-    <div className="bg-white rounded-t-[2.5rem] border-t-4 border-l-4 border-r-4 border-black shadow-[0px_-4px_0px_0px_rgba(0,0,0,0.1)] p-6 mt-4">
+    <div className="bg-white rounded-t-[2.5rem] border-t-4 border-l-4 border-r-4 border-black shadow-[0px_-4px_0px_0px_rgba(0,0,0,0.1)] p-6">
       
       {/* Tabs */}
       <div className="flex justify-center gap-4 mb-6">

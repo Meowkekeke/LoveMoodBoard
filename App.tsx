@@ -156,8 +156,18 @@ const App: React.FC = () => {
   };
 
   const handleInteraction = async (type: InteractionType) => {
-      if (!roomCode) return;
+      if (!roomCode || !roomData) return;
       
+      const isHost = roomData.hostId === userId;
+      // We want to log this on the PARTNER's timeline, so we use their ID
+      // If we are host, partner is guestId. If we are guest, partner is hostId.
+      const targetId = isHost ? roomData.guestId : roomData.hostId;
+
+      if (!targetId) {
+          alert("Partner hasn't joined yet!");
+          return;
+      }
+
       const messages: Record<InteractionType, string> = {
           hug: 'hugs you 🤗',
           kiss: 'kisses you 💋',
@@ -166,8 +176,9 @@ const App: React.FC = () => {
       };
 
       try {
-          // 1. Post a persistent note
-          await logMood(roomCode, userId, userName, null, messages[type], { category: 'needs', icon: 'Heart' });
+          // 1. Post a persistent note to the PARTNER'S ID
+          // We pass 'targetId' as the userId so it appears in the partner's log list
+          await logMood(roomCode, targetId, userName, null, messages[type], { category: 'needs', icon: 'Heart' });
           // 2. Trigger animation
           await sendInteraction(roomCode, userId, type);
       } catch (err) {
@@ -370,12 +381,12 @@ const App: React.FC = () => {
   const partnerLogs = sortedLogs.filter(l => l.userId !== userId);
 
   return (
-    <div className="min-h-screen p-4 flex flex-col max-w-md md:max-w-2xl mx-auto relative">
+    <div className="h-[100dvh] p-4 flex flex-col max-w-md md:max-w-2xl mx-auto relative overflow-hidden">
       <BackgroundDoodles />
       <InteractionOverlay />
       
       {/* Header */}
-      <header className="relative z-20 flex justify-between items-center mb-4 bg-white p-3 rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+      <header className="relative z-20 flex justify-between items-center mb-4 bg-white p-3 rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] shrink-0">
         <div className="flex items-center gap-2">
           <div className="bg-[#86efac] p-2 rounded-lg border-2 border-black">
             <Sprout className="text-black w-5 h-5" />
@@ -402,7 +413,7 @@ const App: React.FC = () => {
       </header>
 
       {/* Tabs */}
-      <nav className="relative z-20 flex gap-2 mb-4">
+      <nav className="relative z-20 flex gap-2 mb-4 shrink-0">
         <button 
           onClick={() => setActiveTab('me')}
           className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all min-w-0 ${
@@ -428,14 +439,14 @@ const App: React.FC = () => {
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col relative z-10 pb-6 min-h-0">
+      <main className="flex-1 flex flex-col relative z-10 min-h-0">
         
         {/* Me Tab */}
         {activeTab === 'me' && (
           <section className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-300">
              
              {/* 1. Status Section */}
-             <div className="mb-4">
+             <div className="mb-4 shrink-0">
                <SocialBattery 
                  level={myState.socialBattery || 80} 
                  onUpdate={handleBatteryUpdate} 
@@ -443,7 +454,7 @@ const App: React.FC = () => {
              </div>
 
              {/* 2. Logs Feed (Scrollable) */}
-             <div className="flex-1 overflow-y-auto min-h-[200px] mb-4 space-y-4 px-1">
+             <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
                 {myLogs.length === 0 ? (
                   <div className="text-center py-10 opacity-60">
                       <p className="font-bold text-xl">No notes yet!</p>
@@ -467,8 +478,10 @@ const App: React.FC = () => {
                 )}
              </div>
 
-             {/* 3. Actions Panel (Sticky Bottom) */}
-             <ActionPanel onLogAction={handleActionLog} />
+             {/* 3. Actions Panel (Locked Bottom) */}
+             <div className="shrink-0 pt-2">
+               <ActionPanel onLogAction={handleActionLog} />
+             </div>
           </section>
         )}
 
@@ -477,14 +490,14 @@ const App: React.FC = () => {
           <section className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
              {roomData.guestId ? (
                 <>
-                  <div className="mb-4">
+                  <div className="mb-4 shrink-0">
                      <SocialBattery 
                         level={partnerState.socialBattery || 80} 
                         readOnly={true}
                      />
                   </div>
                   
-                  <div className="flex-1 overflow-y-auto px-1 space-y-4 mb-4">
+                  <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
                     {partnerLogs.length === 0 ? (
                         <div className="text-center py-10 opacity-60">
                             <p className="font-bold text-xl">Partner hasn't posted yet.</p>
@@ -508,8 +521,10 @@ const App: React.FC = () => {
                     )}
                   </div>
                   
-                  {/* Bottom Interaction Bar */}
-                  <InteractionBar onInteract={handleInteraction} disabled={false} />
+                  {/* Bottom Interaction Bar (Locked Bottom) */}
+                  <div className="shrink-0 pt-2">
+                     <InteractionBar onInteract={handleInteraction} disabled={false} />
+                  </div>
                 </>
              ) : (
                 <div className="bg-white p-8 rounded-3xl border-4 border-black border-dashed text-center">
@@ -525,7 +540,7 @@ const App: React.FC = () => {
 
       {/* Floating Action Button for Text Mood */}
       {activeTab === 'me' && (
-          <div className="fixed bottom-6 right-6 z-40">
+          <div className="fixed bottom-[240px] right-6 z-40">
             <button 
                 onClick={() => setIsEditing(true)}
                 className="w-16 h-16 bg-[#fde047] border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:bg-[#facc15] active:translate-y-1 active:shadow-none transition-all"
