@@ -144,10 +144,19 @@ const App: React.FC = () => {
           return;
       }
 
+      const messages: Record<InteractionType, string> = {
+          hug: 'sent a hug 🤗',
+          kiss: 'sent a kiss 💋',
+          poke: 'poked you 👉',
+          love: 'sent love ❤️'
+      };
+
       try {
-          // This now overwrites the partner's pendingInteraction state
+          // Log to history so it shows in the feed
+          await logMood(roomCode, userId, userName, null, messages[type], { category: 'needs', icon: 'Heart' });
+          
+          // Send persistent popup to partner
           await sendInteraction(roomCode, userId, userName, type);
-          alert(`Sent a ${type}! It will pop up when they check their tab.`);
       } catch (err) {
           console.error(err);
       }
