@@ -69,9 +69,9 @@ export const joinRoom = async (code: string, userId: string, userName: string): 
 };
 
 export const subscribeToRoom = (code: string, callback: (data: RoomData) => void): Unsubscribe => {
-  return onSnapshot(doc(db, ROOM_COLLECTION, code), (doc) => {
-    if (doc.exists()) {
-      callback(doc.data() as RoomData);
+  return onSnapshot(doc(db, ROOM_COLLECTION, code), (snapshot) => {
+    if (snapshot.exists()) {
+      callback(snapshot.data() as RoomData);
     }
   });
 };
