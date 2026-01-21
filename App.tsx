@@ -9,6 +9,7 @@ import { SocialBattery } from './components/SocialBattery';
 import { MenuModal } from './components/MenuModal';
 import { InteractionModal } from './components/InteractionModal';
 import { SentFeedbackModal } from './components/SentFeedbackModal';
+import { RoughFollowUpModal } from './components/RoughFollowUpModal';
 
 // Utility for persistent User ID
 const getUserId = () => {
@@ -40,6 +41,9 @@ const App: React.FC = () => {
   // Modal State for Interactions
   const [sentInteractionData, setSentInteractionData] = useState<{ type: InteractionType; partnerName: string } | null>(null);
   
+  // State for Rough Follow-up
+  const [pendingRoughLog, setPendingRoughLog] = useState<{ icon: string; label: string } | null>(null);
+
   // Subscription Effect
   useEffect(() => {
     if (!roomCode) return;
@@ -121,10 +125,31 @@ const App: React.FC = () => {
 
   const handleActionLog = async (category: 'self_care'|'rough'|'needs', icon: string, label: string) => {
     if (!roomCode) return;
+
+    // Intercept "Rough" category to show follow-up modal
+    if (category === 'rough') {
+      setIsMenuOpen(false);
+      setPendingRoughLog({ icon, label });
+      return;
+    }
+
     try {
       await logMood(roomCode, userId, userName, null, label, { category, icon });
     } catch (err) {
       console.error("Failed to log action", err);
+    }
+  };
+
+  const handleRoughCompletion = async (need: string) => {
+    if (!roomCode || !pendingRoughLog) return;
+    
+    try {
+      // Combine the original label (e.g., "Bad Meeting") with the specific need
+      const combinedNote = `${pendingRoughLog.label} • ${need}`;
+      await logMood(roomCode, userId, userName, null, combinedNote, { category: 'rough', icon: pendingRoughLog.icon });
+      setPendingRoughLog(null);
+    } catch (err) {
+      console.error("Failed to log rough action", err);
     }
   };
 
@@ -469,7 +494,7 @@ const App: React.FC = () => {
                   <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-24">
                     {partnerLogs.length === 0 ? (
                         <div className="text-center py-10 opacity-60">
-                            <p className="font-bold text-xl">Partner hasn't posted yet.</p>
+                            <p className="font-bold text-xl">{partnerTabLabel} hasn't posted yet.</p>
                         </div>
                     ) : (
                         partnerLogs.map(log => (
@@ -516,6 +541,14 @@ const App: React.FC = () => {
           type={sentInteractionData.type}
           partnerName={sentInteractionData.partnerName}
           onClose={() => setSentInteractionData(null)}
+        />
+      )}
+
+      {/* Rough Follow-up Modal */}
+      {pendingRoughLog && (
+        <RoughFollowUpModal 
+          onSelect={handleRoughCompletion}
+          onCancel={() => setPendingRoughLog(null)}
         />
       )}
 
