@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles } from 'lucide-react';
-import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearUserLogs, deleteRoom } from './services/db';
+import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
 import { MoodEditor } from './components/MoodEditor';
@@ -8,6 +8,7 @@ import { DoodleButton } from './components/DoodleButton';
 import { SocialBattery } from './components/SocialBattery';
 import { MenuModal } from './components/MenuModal';
 import { InteractionModal } from './components/InteractionModal';
+import { SentFeedbackModal } from './components/SentFeedbackModal';
 
 // Utility for persistent User ID
 const getUserId = () => {
@@ -35,6 +36,9 @@ const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false); // Controls FAB Menu
   const [showNameModal, setShowNameModal] = useState(!localStorage.getItem('lovesync_name'));
   const [showSettings, setShowSettings] = useState(false);
+  
+  // Modal State for Interactions
+  const [sentInteractionData, setSentInteractionData] = useState<{ type: InteractionType; partnerName: string } | null>(null);
   
   // Subscription Effect
   useEffect(() => {
@@ -138,6 +142,7 @@ const App: React.FC = () => {
       
       const isHost = roomData.hostId === userId;
       const targetId = isHost ? roomData.guestId : roomData.hostId;
+      const targetName = isHost ? roomData.guestState.name : roomData.hostState.name;
 
       if (!targetId) {
           alert("Partner hasn't joined yet!");
@@ -152,11 +157,17 @@ const App: React.FC = () => {
       };
 
       try {
-          // Log to history so it shows in the feed
+          // Log to history
           await logMood(roomCode, userId, userName, null, messages[type], { category: 'needs', icon: 'Heart' });
-          
           // Send persistent popup to partner
           await sendInteraction(roomCode, userId, userName, type);
+          
+          // Show confirmation modal to sender
+          setSentInteractionData({
+            type,
+            partnerName: targetName || 'Partner'
+          });
+
       } catch (err) {
           console.error(err);
       }
@@ -197,9 +208,9 @@ const App: React.FC = () => {
 
   const handleClearMemory = async () => {
     if (!roomCode) return;
-    if (confirm("Are you sure? This will delete all YOUR notes from the garden forever.")) {
+    if (confirm("Are you sure? This will wipe the ENTIRE garden history for BOTH of you. (A fresh start!)")) {
       try {
-        await clearUserLogs(roomCode, userId);
+        await clearRoomLogs(roomCode);
         setShowSettings(false);
       } catch (err) {
         alert("Failed to clear memory.");
@@ -491,12 +502,21 @@ const App: React.FC = () => {
 
       </main>
 
-      {/* Persistent Interaction Pop-up (Only shows when on ME tab) */}
+      {/* Persistent Interaction Pop-up (Only shows when on ME tab) - RECEIVER */}
       {activeTab === 'me' && myState.pendingInteraction && (
           <InteractionModal 
             interaction={myState.pendingInteraction} 
             onDismiss={handleDismissInteraction}
           />
+      )}
+
+      {/* Sent Confirmation Pop-up - SENDER */}
+      {sentInteractionData && (
+        <SentFeedbackModal 
+          type={sentInteractionData.type}
+          partnerName={sentInteractionData.partnerName}
+          onClose={() => setSentInteractionData(null)}
+        />
       )}
 
       {/* Floating Action Button */}
@@ -563,7 +583,7 @@ const App: React.FC = () => {
                 >
                    <div className="text-left">
                      <span className="font-bold text-yellow-800 block">Clear Memories</span>
-                     <span className="text-xs font-bold text-yellow-600">Delete my notes</span>
+                     <span className="text-xs font-bold text-yellow-600">Reset logs for BOTH</span>
                    </div>
                    <Eraser className="text-yellow-600 group-hover:text-yellow-800" />
                 </button>

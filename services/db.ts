@@ -176,32 +176,21 @@ export const dismissInteraction = async (code: string, userId: string) => {
   });
 };
 
-export const clearUserLogs = async (code: string, userId: string) => {
+export const clearRoomLogs = async (code: string) => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
   const snap = await getDoc(roomRef);
   
   if (snap.exists()) {
-    const data = snap.data() as RoomData;
-    const isHost = data.hostId === userId;
-    const isGuest = data.guestId === userId;
-
-    // Filter out logs that belong to this user
-    const newLogs = (data.logs || []).filter(log => log.userId !== userId);
-    
+    // Clear logs completely and reset user states to a "fresh" state
     const updates: any = {
-      logs: newLogs
+      logs: [],
+      'hostState.mood': Mood.HAPPY,
+      'hostState.note': 'Fresh start! 🌱',
+      'hostState.lastUpdated': Date.now(),
+      'guestState.mood': Mood.HAPPY,
+      'guestState.note': 'Fresh start! 🌱',
+      'guestState.lastUpdated': Date.now()
     };
-
-    // Also reset current state to give immediate visual feedback
-    if (isHost) {
-      updates['hostState.mood'] = Mood.HAPPY;
-      updates['hostState.note'] = 'Memories cleared ✨';
-      updates['hostState.lastUpdated'] = Date.now();
-    } else if (isGuest) {
-      updates['guestState.mood'] = Mood.HAPPY;
-      updates['guestState.note'] = 'Memories cleared ✨';
-      updates['guestState.lastUpdated'] = Date.now();
-    }
 
     await updateDoc(roomRef, updates);
   }
