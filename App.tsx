@@ -5,9 +5,8 @@ import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
 import { MoodEditor } from './components/MoodEditor';
 import { DoodleButton } from './components/DoodleButton';
-import { InteractionBar } from './components/InteractionBar';
 import { SocialBattery } from './components/SocialBattery';
-import { ActionPanel } from './components/ActionPanel';
+import { MenuModal } from './components/MenuModal';
 
 // Utility for persistent User ID
 const getUserId = () => {
@@ -31,7 +30,8 @@ const App: React.FC = () => {
   const [inputCode, setInputCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(false); // Controls MoodEditor
+  const [isMenuOpen, setIsMenuOpen] = useState(false); // Controls FAB Menu
   const [showNameModal, setShowNameModal] = useState(!localStorage.getItem('lovesync_name'));
   const [showSettings, setShowSettings] = useState(false);
   
@@ -159,8 +159,6 @@ const App: React.FC = () => {
       if (!roomCode || !roomData) return;
       
       const isHost = roomData.hostId === userId;
-      // We want to log this on the PARTNER's timeline, so we use their ID
-      // If we are host, partner is guestId. If we are guest, partner is hostId.
       const targetId = isHost ? roomData.guestId : roomData.hostId;
 
       if (!targetId) {
@@ -176,13 +174,29 @@ const App: React.FC = () => {
       };
 
       try {
-          // 1. Post a persistent note to the PARTNER'S ID
-          // We pass 'targetId' as the userId so it appears in the partner's log list
           await logMood(roomCode, targetId, userName, null, messages[type], { category: 'needs', icon: 'Heart' });
-          // 2. Trigger animation
           await sendInteraction(roomCode, userId, type);
       } catch (err) {
           console.error(err);
+      }
+  };
+
+  const handleSendPartnerNote = async (note: string) => {
+      if (!roomCode || !roomData) return;
+      const isHost = roomData.hostId === userId;
+      const targetId = isHost ? roomData.guestId : roomData.hostId;
+
+      if (!targetId) {
+          alert("Partner hasn't joined yet!");
+          return;
+      }
+
+      try {
+          // Log note to partner's ID
+          await logMood(roomCode, targetId, userName, null, note, { category: 'needs', icon: 'MessageCircle' });
+      } catch (err) {
+          console.error(err);
+          alert("Failed to send note.");
       }
   };
 
@@ -454,7 +468,7 @@ const App: React.FC = () => {
              </div>
 
              {/* 2. Logs Feed (Scrollable) */}
-             <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
+             <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-24">
                 {myLogs.length === 0 ? (
                   <div className="text-center py-10 opacity-60">
                       <p className="font-bold text-xl">No notes yet!</p>
@@ -477,11 +491,6 @@ const App: React.FC = () => {
                     ))
                 )}
              </div>
-
-             {/* 3. Actions Panel (Locked Bottom) */}
-             <div className="shrink-0 pt-2">
-               <ActionPanel onLogAction={handleActionLog} />
-             </div>
           </section>
         )}
 
@@ -497,7 +506,7 @@ const App: React.FC = () => {
                      />
                   </div>
                   
-                  <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
+                  <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-24">
                     {partnerLogs.length === 0 ? (
                         <div className="text-center py-10 opacity-60">
                             <p className="font-bold text-xl">Partner hasn't posted yet.</p>
@@ -520,11 +529,6 @@ const App: React.FC = () => {
                         ))
                     )}
                   </div>
-                  
-                  {/* Bottom Interaction Bar (Locked Bottom) */}
-                  <div className="shrink-0 pt-2">
-                     <InteractionBar onInteract={handleInteraction} disabled={false} />
-                  </div>
                 </>
              ) : (
                 <div className="bg-white p-8 rounded-3xl border-4 border-black border-dashed text-center">
@@ -538,16 +542,29 @@ const App: React.FC = () => {
 
       </main>
 
-      {/* Floating Action Button for Text Mood */}
-      {activeTab === 'me' && (
-          <div className="fixed bottom-[240px] right-6 z-40">
+      {/* Floating Action Button */}
+      {(roomData.guestId) && (
+          <div className="fixed bottom-6 right-6 z-40">
             <button 
-                onClick={() => setIsEditing(true)}
-                className="w-16 h-16 bg-[#fde047] border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:bg-[#facc15] active:translate-y-1 active:shadow-none transition-all"
+                onClick={() => setIsMenuOpen(true)}
+                className="w-16 h-16 bg-[#fde047] border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:bg-[#facc15] active:translate-y-1 active:shadow-none transition-all animate-bounce-in"
             >
                 <Plus size={32} strokeWidth={3} />
             </button>
           </div>
+      )}
+
+      {/* Main Menu Modal */}
+      {isMenuOpen && (
+        <MenuModal 
+          type={activeTab}
+          partnerName={partnerTabLabel}
+          onClose={() => setIsMenuOpen(false)}
+          onOpenMoodEditor={() => { setIsMenuOpen(false); setIsEditing(true); }}
+          onLogAction={handleActionLog}
+          onInteract={handleInteraction}
+          onSendPartnerNote={handleSendPartnerNote}
+        />
       )}
 
       {/* Editor Modal */}

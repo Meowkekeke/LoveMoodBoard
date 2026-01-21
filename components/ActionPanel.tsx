@@ -42,16 +42,15 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({ onLogAction }) => {
   const config = ACTION_CATEGORIES[activeTab];
 
   return (
-    <div className="bg-white rounded-t-[2.5rem] border-t-4 border-l-4 border-r-4 border-black shadow-[0px_-4px_0px_0px_rgba(0,0,0,0.1)] p-6">
-      
+    <div className="w-full">
       {/* Tabs */}
-      <div className="flex justify-center gap-4 mb-6">
+      <div className="flex justify-center gap-2 sm:gap-4 mb-6">
         {(Object.keys(ACTION_CATEGORIES) as Array<keyof typeof ACTION_CATEGORIES>).map((key) => (
            <button
              key={key}
              onClick={() => setActiveTab(key)}
              className={`
-               px-4 py-2 rounded-full font-bold text-lg border-2 transition-all
+               px-3 py-2 rounded-xl font-bold text-sm sm:text-base border-2 transition-all
                ${activeTab === key 
                  ? `bg-white border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] -translate-y-1` 
                  : 'bg-transparent border-transparent text-gray-400 hover:text-gray-600'
@@ -64,7 +63,7 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({ onLogAction }) => {
       </div>
 
       {/* Grid */}
-      <div className="grid grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-4 gap-3 sm:gap-4">
         {config.items.map((item) => {
           const Icon = IconMap[item.icon] || Edit3;
           return (
@@ -74,9 +73,9 @@ export const ActionPanel: React.FC<ActionPanelProps> = ({ onLogAction }) => {
               className="flex flex-col items-center gap-2 group"
             >
               <div className={`p-3 rounded-2xl border-2 border-transparent bg-gray-50 group-hover:bg-white group-hover:border-black group-hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-all duration-200 group-active:scale-95`}>
-                <Icon size={28} className={item.color} strokeWidth={2.5} />
+                <Icon size={24} className={item.color} strokeWidth={2.5} />
               </div>
-              <span className="text-xs font-bold text-gray-500 text-center leading-tight">{item.label}</span>
+              <span className="text-[10px] sm:text-xs font-bold text-gray-500 text-center leading-tight">{item.label}</span>
             </button>
           );
         })}
