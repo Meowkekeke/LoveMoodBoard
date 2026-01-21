@@ -374,8 +374,9 @@ const App: React.FC = () => {
   // 3. Dashboard (In Room)
   if (!roomData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f0fdf4]">
-        <div className="animate-spin text-6xl">🌻</div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f0fdf4]">
+        <Leaf size={80} className="text-[#86efac] fill-current stroke-black stroke-[3] animate-bounce mb-4" />
+        <p className="text-2xl font-bold text-gray-800 tracking-widest uppercase animate-pulse">Loading...</p>
       </div>
     );
   }
