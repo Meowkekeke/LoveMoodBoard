@@ -1,6 +1,6 @@
-import { doc, setDoc, getDoc, updateDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
+import { doc, setDoc, getDoc, updateDoc, onSnapshot, Unsubscribe, arrayUnion } from 'firebase/firestore';
 import { db } from '../firebase';
-import { RoomData, Mood, UserState, InteractionType, QUESTIONS } from '../types';
+import { RoomData, Mood, UserState, InteractionType, MoodEntry } from '../types';
 
 const ROOM_COLLECTION = 'couple_rooms';
 
@@ -30,8 +30,7 @@ export const createRoom = async (userId: string, userName: string): Promise<stri
     hostState: { ...initialUserState, name: userName },
     guestState: { ...initialUserState, name: 'Waiting for partner...' },
     createdAt: Date.now(),
-    dailyQuestion: QUESTIONS[0],
-    dailyQuestionTimestamp: Date.now()
+    logs: [] // Initialize empty logs
   };
 
   await setDoc(roomRef, initialData);
@@ -78,21 +77,31 @@ export const subscribeToRoom = (code: string, callback: (data: RoomData) => void
   });
 };
 
-export const updateMyState = async (code: string, isHost: boolean, updates: Partial<UserState>) => {
+export const logMood = async (code: string, userId: string, userName: string, mood: Mood, note: string) => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
-  const fieldPrefix = isHost ? 'hostState' : 'guestState';
   
-  // We need to construct the update object dynamically for nested fields
-  const firestoreUpdates: Record<string, any> = {};
-  
-  Object.keys(updates).forEach((key) => {
-    // @ts-ignore
-    firestoreUpdates[`${fieldPrefix}.${key}`] = updates[key as keyof UserState];
-  });
-  
-  firestoreUpdates[`${fieldPrefix}.lastUpdated`] = Date.now();
+  const newEntry: MoodEntry = {
+    id: crypto.randomUUID(),
+    userId,
+    userName,
+    mood,
+    note,
+    timestamp: Date.now()
+  };
 
-  await updateDoc(roomRef, firestoreUpdates);
+  // We add to logs AND update the current state for backward compatibility/profile view
+  const roomSnap = await getDoc(roomRef);
+  if (!roomSnap.exists()) return;
+  const data = roomSnap.data() as RoomData;
+  const isHost = data.hostId === userId;
+  const fieldPrefix = isHost ? 'hostState' : 'guestState';
+
+  await updateDoc(roomRef, {
+    logs: arrayUnion(newEntry),
+    [`${fieldPrefix}.mood`]: mood,
+    [`${fieldPrefix}.note`]: note,
+    [`${fieldPrefix}.lastUpdated`]: Date.now()
+  });
 };
 
 export const sendInteraction = async (code: string, userId: string, type: InteractionType) => {
@@ -103,14 +112,5 @@ export const sendInteraction = async (code: string, userId: string, type: Intera
       senderId: userId,
       timestamp: Date.now()
     }
-  });
-};
-
-export const shuffleQuestion = async (code: string) => {
-  const roomRef = doc(db, ROOM_COLLECTION, code);
-  const randomQ = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
-  await updateDoc(roomRef, {
-    dailyQuestion: randomQ,
-    dailyQuestionTimestamp: Date.now()
   });
 };

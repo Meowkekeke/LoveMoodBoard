@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf } from 'lucide-react';
-import { createRoom, joinRoom, subscribeToRoom, updateMyState, sendInteraction, shuffleQuestion } from './services/db';
+import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus } from 'lucide-react';
+import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
 import { MoodEditor } from './components/MoodEditor';
 import { DoodleButton } from './components/DoodleButton';
 import { InteractionBar } from './components/InteractionBar';
-import { QuestionCard } from './components/QuestionCard';
 
 // Utility for persistent User ID
 const getUserId = () => {
@@ -26,6 +25,7 @@ const App: React.FC = () => {
   const [userName, setUserName] = useState<string>(localStorage.getItem('lovesync_name') || '');
   
   // UI State
+  const [activeTab, setActiveTab] = useState<'me' | 'partner'>('me');
   const [inputCode, setInputCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -112,16 +112,15 @@ const App: React.FC = () => {
     }
   };
 
-  const handleUpdateMood = async (mood: Mood, note: string) => {
+  const handleAddLog = async (mood: Mood, note: string) => {
     if (!roomCode || !roomData) return;
-    const isHost = roomData.hostId === userId;
     
     try {
-      await updateMyState(roomCode, isHost, { mood, note });
+      await logMood(roomCode, userId, userName, mood, note);
       setIsEditing(false);
     } catch (err) {
-      console.error("Failed to update mood", err);
-      alert("Couldn't update mood, check internet!");
+      console.error("Failed to add log", err);
+      alert("Couldn't add note, check internet!");
     }
   };
 
@@ -129,15 +128,9 @@ const App: React.FC = () => {
       if (!roomCode) return;
       try {
           await sendInteraction(roomCode, userId, type);
-          // Optional: Give feedback to sender too? For now, we only animate receiver.
       } catch (err) {
           console.error(err);
       }
-  };
-
-  const handleShuffleQuestion = async () => {
-      if (!roomCode) return;
-      await shuffleQuestion(roomCode);
   };
 
   const handleLeaveRoom = () => {
@@ -294,9 +287,12 @@ const App: React.FC = () => {
     );
   }
 
-  const isHost = roomData.hostId === userId;
-  const myState = isHost ? roomData.hostState : roomData.guestState;
-  const partnerState = isHost ? roomData.guestState : roomData.hostState;
+  // Derived Data for Log View
+  const logs = roomData.logs || []; // Fallback for old rooms
+  const sortedLogs = [...logs].sort((a, b) => b.timestamp - a.timestamp);
+  
+  const myLogs = sortedLogs.filter(l => l.userId === userId);
+  const partnerLogs = sortedLogs.filter(l => l.userId !== userId);
 
   return (
     <div className="min-h-screen p-4 flex flex-col max-w-md md:max-w-2xl mx-auto relative">
@@ -304,93 +300,135 @@ const App: React.FC = () => {
       <InteractionOverlay />
       
       {/* Header */}
-      <header className="relative z-20 flex justify-between items-center mb-6 bg-white p-4 rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+      <header className="relative z-20 flex justify-between items-center mb-4 bg-white p-3 rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
         <div className="flex items-center gap-2">
           <div className="bg-[#86efac] p-2 rounded-lg border-2 border-black">
-            <Sprout className="text-black w-6 h-6" />
+            <Sprout className="text-black w-5 h-5" />
           </div>
-          <h1 className="font-bold text-2xl tracking-tight hidden sm:block">LoveSync</h1>
+          <h1 className="font-bold text-xl tracking-tight hidden sm:block">LoveSync</h1>
         </div>
         
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2">
           <button 
             onClick={copyCode}
-            className="flex items-center gap-2 px-4 py-2 bg-[#fde047] hover:bg-[#facc15] border-2 border-black rounded-xl text-sm font-bold transition-all active:scale-95 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+            className="flex items-center gap-1 px-3 py-1.5 bg-[#fde047] hover:bg-[#facc15] border-2 border-black rounded-lg text-xs font-bold transition-all active:scale-95 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
           >
-            <span className="font-mono text-base">{roomCode}</span>
-            <Copy size={16} />
+            <span className="font-mono">{roomCode}</span>
+            <Copy size={12} />
           </button>
-          <button onClick={handleLeaveRoom} className="p-2 bg-white hover:bg-red-100 border-2 border-black rounded-xl text-black transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
-            <LogOut size={20} />
+          <button onClick={handleLeaveRoom} className="p-2 bg-white hover:bg-red-100 border-2 border-black rounded-lg text-black transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+            <LogOut size={16} />
           </button>
         </div>
       </header>
 
-      {/* Main Grid */}
-      <main className="flex-1 flex flex-col gap-6 relative z-10 pb-20">
+      {/* Tabs */}
+      <nav className="relative z-20 flex gap-2 mb-4">
+        <button 
+          onClick={() => setActiveTab('me')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all ${
+            activeTab === 'me' 
+              ? 'bg-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]' 
+              : 'bg-black/5 border-transparent text-gray-500 hover:bg-black/10'
+          }`}
+        >
+          <User size={20} />
+          My Log
+        </button>
+        <button 
+          onClick={() => setActiveTab('partner')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all ${
+            activeTab === 'partner' 
+              ? 'bg-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]' 
+              : 'bg-black/5 border-transparent text-gray-500 hover:bg-black/10'
+          }`}
+        >
+          <Users size={20} />
+          Partner Log
+        </button>
+      </nav>
+
+      {/* Main Content Area: List View */}
+      <main className="flex-1 flex flex-col gap-4 relative z-10 pb-24 overflow-y-auto">
         
-        {/* Interaction Bar */}
-        <section>
-            <InteractionBar onInteract={handleInteraction} disabled={!roomData.guestId} />
-        </section>
+        {/* Me Tab */}
+        {activeTab === 'me' && (
+          <section className="animate-in fade-in slide-in-from-left-4 duration-300 space-y-4">
+            {myLogs.length === 0 ? (
+               <div className="text-center py-10 opacity-60">
+                  <p className="font-bold text-xl">No notes yet!</p>
+                  <p>Click + to add one.</p>
+               </div>
+            ) : (
+                myLogs.map(log => (
+                    <MoodCard 
+                        key={log.id} 
+                        data={{
+                            name: log.userName,
+                            mood: log.mood,
+                            note: log.note,
+                            timestamp: log.timestamp
+                        }}
+                        isMe={true}
+                    />
+                ))
+            )}
+          </section>
+        )}
 
-        {/* My Card */}
-        <section>
-          <div className="flex justify-between items-end mb-1 px-4">
-            <h2 className="text-2xl font-bold text-gray-800 bg-white/50 px-3 py-1 rounded-t-xl border-t-2 border-x-2 border-black/10 inline-block">Me</h2>
-          </div>
-          <MoodCard 
-            userState={myState} 
-            isMe={true} 
-            onEdit={() => setIsEditing(true)} 
-          />
-        </section>
-
-        {/* Connector */}
-        <div className="flex justify-center -my-8 z-20 relative pointer-events-none">
-             <div className="bg-white border-4 border-black rounded-full p-3 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] rotate-3">
-                <Heart className="w-8 h-8 text-[#fca5a5] fill-current animate-pulse" />
-             </div>
-        </div>
-
-        {/* Partner Card */}
-        <section className={`transition-all duration-500 ${!roomData.guestId && isHost ? 'opacity-70 blur-[1px]' : 'opacity-100'}`}>
-          <div className="flex justify-between items-end mb-1 px-4">
-             <h2 className="text-2xl font-bold text-gray-800 bg-white/50 px-3 py-1 rounded-t-xl border-t-2 border-x-2 border-black/10 inline-block">Partner</h2>
-          </div>
-          <MoodCard 
-            userState={partnerState} 
-            isMe={false} 
-          />
-          {!roomData.guestId && isHost && (
-             <div className="mt-4 bg-white p-4 rounded-xl border-2 border-black border-dashed text-center">
-                <p className="font-bold text-gray-500 animate-pulse">Waiting for partner...</p>
-                <p className="text-sm">Share code: <span className="font-mono bg-yellow-200 px-1">{roomCode}</span></p>
-             </div>
-          )}
-        </section>
-        
-        {/* Daily Question */}
-        <QuestionCard 
-            question={roomData.dailyQuestion || "What's on your mind?"} 
-            onShuffle={handleShuffleQuestion} 
-        />
+        {/* Partner Tab */}
+        {activeTab === 'partner' && (
+          <section className="animate-in fade-in slide-in-from-right-4 duration-300 space-y-4">
+             {roomData.guestId ? (
+                <>
+                  <InteractionBar onInteract={handleInteraction} disabled={false} />
+                  {partnerLogs.length === 0 ? (
+                     <div className="text-center py-10 opacity-60">
+                        <p className="font-bold text-xl">Partner hasn't posted yet.</p>
+                     </div>
+                  ) : (
+                      partnerLogs.map(log => (
+                        <MoodCard 
+                            key={log.id} 
+                            data={{
+                                name: log.userName,
+                                mood: log.mood,
+                                note: log.note,
+                                timestamp: log.timestamp
+                            }}
+                            isMe={false}
+                        />
+                      ))
+                  )}
+                </>
+             ) : (
+                <div className="bg-white p-8 rounded-3xl border-4 border-black border-dashed text-center">
+                    <div className="animate-spin text-4xl mb-4">⏳</div>
+                    <p className="font-bold text-gray-500 text-xl">Waiting for partner...</p>
+                    <p className="mt-2">Share code: <span className="font-mono bg-[#fde047] px-2 py-1 rounded border-2 border-black">{roomCode}</span></p>
+                </div>
+             )}
+          </section>
+        )}
 
       </main>
 
-      {/* Footer */}
-      <footer className="mt-auto py-6 text-center text-gray-500 font-bold relative z-10">
-        <p className="flex items-center justify-center gap-2">
-            Made with <Heart size={16} className="fill-[#fca5a5] text-[#fca5a5]" /> for us
-        </p>
-      </footer>
+      {/* Floating Action Button (Only on 'me' tab or always?) -> Always visible for quick add */}
+      <div className="fixed bottom-6 right-6 z-30">
+        <button 
+            onClick={() => setIsEditing(true)}
+            className="w-16 h-16 bg-[#fde047] border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:bg-[#facc15] active:translate-y-1 active:shadow-none transition-all"
+        >
+            <Plus size={32} strokeWidth={3} />
+        </button>
+      </div>
 
       {/* Editor Modal */}
       {isEditing && (
         <MoodEditor 
-          currentMood={myState.mood}
-          currentNote={myState.note}
-          onSave={handleUpdateMood}
+          currentMood={Mood.HAPPY} // Default for new entry
+          currentNote=""
+          onSave={handleAddLog}
           onCancel={() => setIsEditing(false)}
         />
       )}

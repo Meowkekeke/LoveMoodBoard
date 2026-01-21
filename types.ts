@@ -1,12 +1,21 @@
 export enum Mood {
+  // Positive
   HAPPY = 'happy',
+  EXCITED = 'excited',
+  ROMANTIC = 'romantic',
+  CHILL = 'chill',
+  GRATEFUL = 'grateful',
+  
+  // Neutral/Body
+  HUNGRY = 'hungry',
+  TIRED = 'tired',
+  CONFUSED = 'confused',
+
+  // Negative
   SAD = 'sad',
   ANGRY = 'angry',
-  ROMANTIC = 'romantic',
-  TIRED = 'tired',
-  EXCITED = 'excited',
-  HUNGRY = 'hungry',
-  CHILL = 'chill'
+  SICK = 'sick',
+  STRESSED = 'stressed'
 }
 
 export type InteractionType = 'water' | 'sun' | 'love' | 'poke';
@@ -24,6 +33,15 @@ export interface UserState {
   lastUpdated: number; // Timestamp
 }
 
+export interface MoodEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  mood: Mood;
+  note: string;
+  timestamp: number;
+}
+
 export interface RoomData {
   hostId: string;
   guestId?: string; // Optional until guest joins
@@ -31,43 +49,48 @@ export interface RoomData {
   guestState: UserState;
   createdAt: number;
   lastInteraction?: Interaction;
-  dailyQuestion?: string;
-  dailyQuestionTimestamp?: number;
+  logs: MoodEntry[];
 }
 
-export const MOOD_EMOJIS: Record<Mood, string> = {
-  [Mood.HAPPY]: '😊',
-  [Mood.SAD]: '😢',
-  [Mood.ANGRY]: '😠',
-  [Mood.ROMANTIC]: '🥰',
-  [Mood.TIRED]: '😴',
-  [Mood.EXCITED]: '🤩',
-  [Mood.HUNGRY]: '🤤',
-  [Mood.CHILL]: '😎',
+export type MoodCategory = 'positive' | 'neutral' | 'negative';
+
+export const MOOD_CATEGORIES: Record<MoodCategory, { label: string, emoji: string, moods: Mood[], baseColor: string }> = {
+  positive: { 
+    label: 'Happy', 
+    emoji: '😊',
+    moods: [Mood.HAPPY, Mood.EXCITED, Mood.ROMANTIC, Mood.CHILL, Mood.GRATEFUL],
+    baseColor: 'bg-[#fef9c3]' // Yellow-100
+  },
+  neutral: { 
+    label: 'Ok-ish', 
+    emoji: '😐',
+    moods: [Mood.HUNGRY, Mood.TIRED, Mood.CONFUSED],
+    baseColor: 'bg-[#f3f4f6]' // Gray-100
+  },
+  negative: { 
+    label: 'Not Good', 
+    emoji: '😫',
+    moods: [Mood.SAD, Mood.ANGRY, Mood.SICK, Mood.STRESSED],
+    baseColor: 'bg-[#dbeafe]' // Blue-100
+  }
 };
 
 export const MOOD_COLORS: Record<Mood, string> = {
+  // Positive
   [Mood.HAPPY]: 'bg-yellow-200',
+  [Mood.EXCITED]: 'bg-orange-200',
+  [Mood.ROMANTIC]: 'bg-pink-200',
+  [Mood.CHILL]: 'bg-purple-200',
+  [Mood.GRATEFUL]: 'bg-teal-200',
+  
+  // Neutral
+  [Mood.HUNGRY]: 'bg-lime-200',
+  [Mood.TIRED]: 'bg-slate-200',
+  [Mood.CONFUSED]: 'bg-amber-100', // Beige
+
+  // Negative
   [Mood.SAD]: 'bg-blue-200',
   [Mood.ANGRY]: 'bg-red-200',
-  [Mood.ROMANTIC]: 'bg-pink-200',
-  [Mood.TIRED]: 'bg-gray-200',
-  [Mood.EXCITED]: 'bg-orange-200',
-  [Mood.HUNGRY]: 'bg-green-200',
-  [Mood.CHILL]: 'bg-purple-200',
+  [Mood.SICK]: 'bg-emerald-100', // Sickly green
+  [Mood.STRESSED]: 'bg-rose-200',
 };
-
-export const QUESTIONS = [
-  "What's the best thing that happened today?",
-  "What are you craving right now?",
-  "If we could teleport anywhere, where to?",
-  "What's a movie you want to watch together?",
-  "What's your favorite memory of us recently?",
-  "How can I make your day better?",
-  "What's a small goal for this week?",
-  "Send a selfie right now!",
-  "What song describes your mood?",
-  "Rate your energy level 1-10.",
-  "Plan our next date meal.",
-  "What's something funny you saw today?"
-];

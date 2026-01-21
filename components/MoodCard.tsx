@@ -1,15 +1,22 @@
 import React from 'react';
-import { Mood, MOOD_COLORS, MOOD_EMOJIS, UserState } from '../types';
-import { Clock, PenLine } from 'lucide-react';
+import { MOOD_COLORS, Mood } from '../types';
+import { Clock } from 'lucide-react';
+import { MoodIcon } from './MoodIcon';
 
-interface MoodCardProps {
-  userState: UserState;
-  isMe: boolean;
-  onEdit?: () => void;
+interface MoodData {
+  name: string;
+  mood: Mood;
+  note: string;
+  timestamp: number;
 }
 
-export const MoodCard: React.FC<MoodCardProps> = ({ userState, isMe, onEdit }) => {
-  const bgColor = MOOD_COLORS[userState.mood] || 'bg-white';
+interface MoodCardProps {
+  data: MoodData;
+  isMe: boolean;
+}
+
+export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe }) => {
+  const bgColor = MOOD_COLORS[data.mood] || 'bg-white';
   
   // Format time relative
   const getTimeString = (timestamp: number) => {
@@ -19,54 +26,45 @@ export const MoodCard: React.FC<MoodCardProps> = ({ userState, isMe, onEdit }) =
     if (mins < 60) return `${mins}m ago`;
     const hours = Math.floor(mins / 60);
     if (hours < 24) return `${hours}h ago`;
-    return 'A while ago';
+    if (hours < 48) return 'Yesterday';
+    return new Date(timestamp).toLocaleDateString();
   };
 
   return (
-    <div className="relative group">
-      {/* Washi Tape Effect */}
-      <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-32 h-8 bg-[#fde047]/80 backdrop-blur-sm border-2 border-black/20 rotate-[-2deg] z-10 shadow-sm clip-path-tape"></div>
+    <div className="relative group w-full max-w-md mx-auto mb-4">
+       {/* Tape - placed to look like it's sticking the ticket to the board */}
+       <div className="absolute -top-2 left-[15%] w-12 h-5 bg-[#fde047]/90 backdrop-blur-sm border border-black/20 rotate-[-3deg] z-20 shadow-sm clip-path-tape"></div>
 
-      <div className={`relative flex flex-col items-center p-6 border-4 border-black rounded-3xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] ${bgColor} transition-transform hover:-translate-y-1 bg-opacity-90`}>
-        {isMe && (
-          <div className="absolute top-4 right-4 bg-white border-2 border-black rounded-xl px-3 py-1 text-sm font-bold -rotate-12 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-            YOU
+       <div className="flex w-full bg-white border-2 border-black rounded-xl shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-hidden min-h-[90px] transition-transform hover:-translate-y-0.5">
+          
+          {/* LHS: 1/4 - Icon & Color Area */}
+          <div className={`w-[25%] min-w-[70px] ${bgColor} border-r-2 border-black flex flex-col items-center justify-center p-2 relative`}>
+              {isMe && (
+                 <div className="absolute top-1 left-1 bg-black text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold tracking-wider z-10">YOU</div>
+              )}
+              <MoodIcon mood={data.mood} className="w-10 h-10 sm:w-12 sm:h-12 text-black/80" />
           </div>
-        )}
-        
-        <div className="w-full text-center mb-2 mt-4">
-          <h3 className="text-2xl font-bold border-b-4 border-black/10 pb-2 inline-block px-4">
-            {userState.name}
-          </h3>
-        </div>
 
-        <div className="text-9xl mb-6 mt-2 animate-bounce hover:animate-pulse cursor-default select-none filter drop-shadow-md transform transition-transform hover:scale-110 duration-300">
-          {MOOD_EMOJIS[userState.mood]}
-        </div>
-
-        <div className="w-full bg-white/80 p-5 rounded-2xl border-4 border-black/10 min-h-[100px] flex items-center justify-center text-center relative">
-          {/* Note decoration */}
-          <div className="absolute -top-3 -left-2 text-2xl rotate-[-15deg]">📌</div>
-          <p className="text-xl leading-snug italic font-medium text-gray-800">
-            "{userState.note || "No status yet..."}"
-          </p>
-        </div>
-
-        <div className="mt-6 flex items-center text-sm text-gray-800 font-bold bg-white/60 px-4 py-2 rounded-full border-2 border-black/10">
-          <Clock size={16} className="mr-2" />
-          {getTimeString(userState.lastUpdated)}
-        </div>
-
-        {isMe && onEdit && (
-          <button 
-            onClick={onEdit}
-            className="absolute -bottom-5 right-6 bg-white border-4 border-black p-3 rounded-full font-bold hover:bg-gray-50 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:shadow-none active:translate-y-[4px] rotate-3 hover:rotate-12 transition-all"
-            title="Update Mood"
-          >
-            <PenLine size={24} />
-          </button>
-        )}
-      </div>
+          {/* RHS: 3/4 - Content Area */}
+          <div className="w-[75%] p-3 flex flex-col relative">
+              
+              {/* Header: Name + Time */}
+              <div className="flex justify-between items-baseline mb-1 border-b border-gray-100 pb-1">
+                  <h3 className="font-bold text-sm text-gray-700 truncate pr-2">{data.name}</h3>
+                  <div className="flex items-center text-[10px] font-bold text-gray-400 shrink-0 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">
+                    <Clock size={10} className="mr-1" />
+                    {getTimeString(data.timestamp)}
+                  </div>
+              </div>
+              
+              {/* Note Body */}
+              <div className="flex-1 flex items-start pt-1">
+                  <p className="font-[Patrick_Hand] text-base leading-5 text-gray-900 break-words w-full">
+                      {data.note || <span className="text-gray-300 italic text-sm">No notes...</span>}
+                  </p>
+              </div>
+          </div>
+       </div>
     </div>
   );
 };
