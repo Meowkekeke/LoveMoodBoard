@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Mood, MOOD_EMOJIS, MOOD_COLORS } from '../types';
 import { DoodleButton } from './DoodleButton';
-import { X } from 'lucide-react';
+import { X, Sparkles } from 'lucide-react';
 
 interface MoodEditorProps {
   currentMood: Mood;
@@ -20,56 +20,62 @@ export const MoodEditor: React.FC<MoodEditorProps> = ({ currentMood, currentNote
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-md rounded-2xl border-4 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-6 relative overflow-y-auto max-h-[90vh]">
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="bg-[#fffbeb] w-full max-w-md rounded-[2rem] border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-6 relative overflow-y-auto max-h-[90vh] transform scale-100">
         <button 
           onClick={onCancel}
-          className="absolute top-4 right-4 p-1 hover:bg-gray-100 rounded-full transition-colors"
+          className="absolute top-5 right-5 p-2 bg-white border-2 border-black rounded-full hover:bg-red-100 transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-1 active:shadow-none"
         >
-          <X size={24} />
+          <X size={20} />
         </button>
 
-        <h2 className="text-3xl font-bold text-center mb-6">How are you feeling?</h2>
+        <div className="flex justify-center items-center gap-2 mb-6 mt-2">
+            <Sparkles className="text-[#fde047] fill-current" />
+            <h2 className="text-3xl font-bold text-center">Current Vibe?</h2>
+            <Sparkles className="text-[#fde047] fill-current" />
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-4 sm:gap-4">
             {Object.values(Mood).map((mood) => (
               <button
                 key={mood}
                 type="button"
                 onClick={() => setSelectedMood(mood)}
                 className={`
-                  aspect-square flex flex-col items-center justify-center rounded-xl border-2 transition-all
+                  aspect-square flex flex-col items-center justify-center rounded-2xl border-4 transition-all duration-200
                   ${selectedMood === mood 
-                    ? `border-black ${MOOD_COLORS[mood]} scale-110 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] z-10` 
-                    : 'border-transparent hover:bg-gray-100 hover:border-gray-200'
+                    ? `border-black ${MOOD_COLORS[mood]} -translate-y-2 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] z-10 rotate-[-3deg]` 
+                    : 'border-transparent hover:bg-black/5 hover:border-black/10 hover:scale-105'
                   }
                 `}
               >
-                <span className="text-3xl">{MOOD_EMOJIS[mood]}</span>
+                <span className="text-3xl sm:text-4xl">{MOOD_EMOJIS[mood]}</span>
               </button>
             ))}
           </div>
 
-          <div className="space-y-2">
-            <label className="font-bold text-lg ml-1">Add a little note:</label>
+          <div className="space-y-2 bg-white p-4 rounded-2xl border-4 border-black/10">
+            <label className="font-bold text-xl ml-1 flex items-center gap-2">
+                ✏️ Add a note:
+            </label>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
-              className="w-full p-4 border-2 border-black rounded-xl resize-none focus:outline-none focus:ring-4 ring-[#A1C4FD]/50 text-xl font-[Patrick_Hand]"
+              className="w-full p-3 border-2 border-black rounded-xl resize-none focus:outline-none focus:ring-4 ring-[#86efac]/50 text-xl font-[Patrick_Hand] bg-gray-50"
               rows={3}
-              placeholder="I'm craving tacos..."
+              placeholder="Spill the tea... 🍵"
               maxLength={60}
             />
-            <div className="text-right text-sm text-gray-500">{note.length}/60</div>
+            <div className="text-right text-sm text-gray-500 font-bold">{note.length}/60</div>
           </div>
 
           <div className="flex gap-4 pt-2">
             <DoodleButton type="button" variant="secondary" onClick={onCancel} className="flex-1">
-              Cancel
+              Nah
             </DoodleButton>
             <DoodleButton type="submit" variant="primary" className="flex-1">
-              Share Mood
+              Post It!
             </DoodleButton>
           </div>
         </form>

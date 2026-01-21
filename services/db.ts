@@ -1,6 +1,6 @@
 import { doc, setDoc, getDoc, updateDoc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { db } from '../firebase';
-import { RoomData, Mood, UserState } from '../types';
+import { RoomData, Mood, UserState, InteractionType, QUESTIONS } from '../types';
 
 const ROOM_COLLECTION = 'couple_rooms';
 
@@ -30,6 +30,8 @@ export const createRoom = async (userId: string, userName: string): Promise<stri
     hostState: { ...initialUserState, name: userName },
     guestState: { ...initialUserState, name: 'Waiting for partner...' },
     createdAt: Date.now(),
+    dailyQuestion: QUESTIONS[0],
+    dailyQuestionTimestamp: Date.now()
   };
 
   await setDoc(roomRef, initialData);
@@ -91,4 +93,24 @@ export const updateMyState = async (code: string, isHost: boolean, updates: Part
   firestoreUpdates[`${fieldPrefix}.lastUpdated`] = Date.now();
 
   await updateDoc(roomRef, firestoreUpdates);
+};
+
+export const sendInteraction = async (code: string, userId: string, type: InteractionType) => {
+  const roomRef = doc(db, ROOM_COLLECTION, code);
+  await updateDoc(roomRef, {
+    lastInteraction: {
+      type,
+      senderId: userId,
+      timestamp: Date.now()
+    }
+  });
+};
+
+export const shuffleQuestion = async (code: string) => {
+  const roomRef = doc(db, ROOM_COLLECTION, code);
+  const randomQ = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+  await updateDoc(roomRef, {
+    dailyQuestion: randomQ,
+    dailyQuestionTimestamp: Date.now()
+  });
 };
