@@ -48,6 +48,14 @@ export interface MoodEntry {
   timestamp: number;
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
+}
+
 export interface RoomData {
   hostId: string;
   guestId?: string; // Optional until guest joins
@@ -56,6 +64,11 @@ export interface RoomData {
   createdAt: number;
   lastInteraction?: Interaction; // Kept for legacy or global effects if needed
   logs: MoodEntry[];
+  
+  // Conversation Zone State
+  conversationActive?: boolean;
+  conversationTopic?: string;
+  messages?: ChatMessage[];
 }
 
 export type MoodCategory = 'positive' | 'neutral' | 'negative';

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles } from 'lucide-react';
-import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom } from './services/db';
+import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom, startConversation } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
 import { MoodEditor } from './components/MoodEditor';
@@ -10,6 +10,7 @@ import { MenuModal } from './components/MenuModal';
 import { InteractionModal } from './components/InteractionModal';
 import { SentFeedbackModal } from './components/SentFeedbackModal';
 import { RoughFollowUpModal } from './components/RoughFollowUpModal';
+import { ConversationZone } from './components/ConversationZone';
 
 // Utility for persistent User ID
 const getUserId = () => {
@@ -135,6 +136,11 @@ const App: React.FC = () => {
 
     try {
       await logMood(roomCode, userId, userName, null, label, { category, icon });
+      
+      // If category is NEEDS, start conversation immediately
+      if (category === 'needs') {
+        await startConversation(roomCode, `${userName} posted: ${label}`);
+      }
     } catch (err) {
       console.error("Failed to log action", err);
     }
@@ -148,6 +154,10 @@ const App: React.FC = () => {
       const combinedNote = `${pendingRoughLog.label} • ${need}`;
       await logMood(roomCode, userId, userName, null, combinedNote, { category: 'rough', icon: pendingRoughLog.icon });
       setPendingRoughLog(null);
+
+      // Trigger Conversation
+      await startConversation(roomCode, `${userName} is having a rough time: ${combinedNote}`);
+
     } catch (err) {
       console.error("Failed to log rough action", err);
     }
@@ -551,9 +561,20 @@ const App: React.FC = () => {
           onCancel={() => setPendingRoughLog(null)}
         />
       )}
+      
+      {/* CONVERSATION ZONE OVERLAY */}
+      {roomData.conversationActive && (
+        <ConversationZone 
+          roomCode={roomCode}
+          userId={userId}
+          userName={userName}
+          topic={roomData.conversationTopic || 'General Chat'}
+          messages={roomData.messages || []}
+        />
+      )}
 
       {/* Floating Action Button */}
-      {(roomData.guestId) && (
+      {(roomData.guestId && !roomData.conversationActive) && (
           <div className="fixed bottom-6 right-6 z-40">
             <button 
                 onClick={() => setIsMenuOpen(true)}

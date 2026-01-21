@@ -1,6 +1,6 @@
 import { doc, setDoc, getDoc, updateDoc, onSnapshot, Unsubscribe, arrayUnion, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { RoomData, Mood, UserState, InteractionType, MoodEntry } from '../types';
+import { RoomData, Mood, UserState, InteractionType, MoodEntry, ChatMessage } from '../types';
 
 const ROOM_COLLECTION = 'couple_rooms';
 
@@ -32,7 +32,9 @@ export const createRoom = async (userId: string, userName: string): Promise<stri
     hostState: { ...initialUserState, name: userName },
     guestState: { ...initialUserState, name: 'Waiting for partner...' },
     createdAt: Date.now(),
-    logs: [] // Initialize empty logs
+    logs: [], // Initialize empty logs
+    conversationActive: false,
+    messages: []
   };
 
   await setDoc(roomRef, initialData);
@@ -189,7 +191,9 @@ export const clearRoomLogs = async (code: string) => {
       'hostState.lastUpdated': Date.now(),
       'guestState.mood': Mood.HAPPY,
       'guestState.note': 'Fresh start! 🌱',
-      'guestState.lastUpdated': Date.now()
+      'guestState.lastUpdated': Date.now(),
+      conversationActive: false,
+      messages: []
     };
 
     await updateDoc(roomRef, updates);
@@ -199,4 +203,40 @@ export const clearRoomLogs = async (code: string) => {
 export const deleteRoom = async (code: string) => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
   await deleteDoc(roomRef);
+};
+
+// --- CONVERSATION ZONE HELPERS ---
+
+export const startConversation = async (code: string, topic: string) => {
+  const roomRef = doc(db, ROOM_COLLECTION, code);
+  await updateDoc(roomRef, {
+    conversationActive: true,
+    conversationTopic: topic,
+    messages: [] // Reset messages for new topic
+  });
+};
+
+export const sendChatMessage = async (code: string, userId: string, userName: string, text: string) => {
+  const roomRef = doc(db, ROOM_COLLECTION, code);
+  
+  const newMessage: ChatMessage = {
+    id: crypto.randomUUID(),
+    senderId: userId,
+    senderName: userName,
+    text,
+    timestamp: Date.now()
+  };
+
+  await updateDoc(roomRef, {
+    messages: arrayUnion(newMessage)
+  });
+};
+
+export const endConversation = async (code: string) => {
+  const roomRef = doc(db, ROOM_COLLECTION, code);
+  await updateDoc(roomRef, {
+    conversationActive: false
+    // We keep the messages in the doc if we want, but UI won't show them.
+    // Ideally we might move them to a history, but for now just hiding the zone is enough.
+  });
 };
