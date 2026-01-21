@@ -453,7 +453,7 @@ const App: React.FC = () => {
              </div>
 
              {/* 2. Logs Feed (Scrollable) */}
-             <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-24">
+             <div className="flex-1 overflow-y-auto px-4 space-y-6 pb-24">
                 {myLogs.length === 0 ? (
                   <div className="text-center py-10 opacity-60">
                       <p className="font-bold text-xl">No notes yet!</p>
@@ -491,7 +491,7 @@ const App: React.FC = () => {
                      />
                   </div>
                   
-                  <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-24">
+                  <div className="flex-1 overflow-y-auto px-4 space-y-6 pb-24">
                     {partnerLogs.length === 0 ? (
                         <div className="text-center py-10 opacity-60">
                             <p className="font-bold text-xl">{partnerTabLabel} hasn't posted yet.</p>
