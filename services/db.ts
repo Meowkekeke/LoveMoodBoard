@@ -20,6 +20,7 @@ const initialUserState: UserState = {
   note: 'Just joined!',
   socialBattery: 80,
   lastUpdated: Date.now(),
+  pendingInteraction: null
 };
 
 export const createRoom = async (userId: string, userName: string): Promise<string> => {
@@ -63,7 +64,8 @@ export const joinRoom = async (code: string, userId: string, userName: string): 
      await updateDoc(roomRef, {
       guestId: userId,
       'guestState.name': userName,
-      'guestState.lastUpdated': Date.now()
+      'guestState.lastUpdated': Date.now(),
+      'guestState.pendingInteraction': null
     });
   }
 
@@ -138,14 +140,39 @@ export const updateSocialBattery = async (code: string, userId: string, level: n
     });
 };
 
-export const sendInteraction = async (code: string, userId: string, type: InteractionType) => {
+// Send interaction to the PARTNER'S pending state
+export const sendInteraction = async (code: string, senderId: string, senderName: string, type: InteractionType) => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
+  const roomSnap = await getDoc(roomRef);
+  if (!roomSnap.exists()) return;
+  const data = roomSnap.data() as RoomData;
+  
+  // If I am the host, I'm sending TO the guest
+  const isHost = data.hostId === senderId;
+  const targetFieldPrefix = isHost ? 'guestState' : 'hostState';
+
   await updateDoc(roomRef, {
-    lastInteraction: {
+    [`${targetFieldPrefix}.pendingInteraction`]: {
       type,
-      senderId: userId,
+      senderId,
+      senderName,
       timestamp: Date.now()
     }
+  });
+};
+
+// Clear my own pending interaction
+export const dismissInteraction = async (code: string, userId: string) => {
+  const roomRef = doc(db, ROOM_COLLECTION, code);
+  const roomSnap = await getDoc(roomRef);
+  if (!roomSnap.exists()) return;
+  const data = roomSnap.data() as RoomData;
+  
+  const isHost = data.hostId === userId;
+  const myFieldPrefix = isHost ? 'hostState' : 'guestState';
+
+  await updateDoc(roomRef, {
+    [`${myFieldPrefix}.pendingInteraction`]: null
   });
 };
 

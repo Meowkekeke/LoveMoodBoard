@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles } from 'lucide-react';
-import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, updateSocialBattery, clearUserLogs, deleteRoom } from './services/db';
+import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearUserLogs, deleteRoom } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
 import { MoodEditor } from './components/MoodEditor';
 import { DoodleButton } from './components/DoodleButton';
 import { SocialBattery } from './components/SocialBattery';
 import { MenuModal } from './components/MenuModal';
+import { InteractionModal } from './components/InteractionModal';
 
 // Utility for persistent User ID
 const getUserId = () => {
@@ -35,10 +36,6 @@ const App: React.FC = () => {
   const [showNameModal, setShowNameModal] = useState(!localStorage.getItem('lovesync_name'));
   const [showSettings, setShowSettings] = useState(false);
   
-  // Animation State
-  const [animationType, setAnimationType] = useState<InteractionType | null>(null);
-  const lastInteractionRef = useRef<number>(0);
-
   // Subscription Effect
   useEffect(() => {
     if (!roomCode) return;
@@ -55,29 +52,10 @@ const App: React.FC = () => {
       }
 
       setRoomData(data);
-
-      // Handle Interactions
-      if (data.lastInteraction) {
-        const { timestamp, senderId, type } = data.lastInteraction;
-        // Only animate if it's a new interaction and NOT sent by me
-        if (timestamp > lastInteractionRef.current && senderId !== userId) {
-          triggerAnimation(type);
-          lastInteractionRef.current = timestamp;
-        } 
-        // Sync ref on initial load to avoid playing old animations
-        else if (lastInteractionRef.current === 0) {
-            lastInteractionRef.current = timestamp;
-        }
-      }
     });
 
     return () => unsubscribe();
   }, [roomCode, userId]);
-
-  const triggerAnimation = (type: InteractionType) => {
-    setAnimationType(type);
-    setTimeout(() => setAnimationType(null), 3000);
-  };
 
   // Actions
   const handleCreateRoom = async () => {
@@ -166,19 +144,18 @@ const App: React.FC = () => {
           return;
       }
 
-      const messages: Record<InteractionType, string> = {
-          hug: 'hugs you 🤗',
-          kiss: 'kisses you 💋',
-          poke: 'pokes you 👉',
-          love: 'loves you ❤️'
-      };
-
       try {
-          await logMood(roomCode, targetId, userName, null, messages[type], { category: 'needs', icon: 'Heart' });
-          await sendInteraction(roomCode, userId, type);
+          // This now overwrites the partner's pendingInteraction state
+          await sendInteraction(roomCode, userId, userName, type);
+          alert(`Sent a ${type}! It will pop up when they check their tab.`);
       } catch (err) {
           console.error(err);
       }
+  };
+
+  const handleDismissInteraction = async () => {
+      if (!roomCode) return;
+      await dismissInteraction(roomCode, userId);
   };
 
   const handleSendPartnerNote = async (note: string) => {
@@ -260,43 +237,6 @@ const App: React.FC = () => {
       <Leaf className="absolute bottom-20 right-20 text-[#86efac]/40 w-20 h-20 rotate-45" />
     </div>
   );
-
-  const InteractionOverlay = () => {
-    if (!animationType) return null;
-
-    return (
-        <div className="fixed inset-0 z-50 pointer-events-none flex items-center justify-center overflow-hidden">
-            {animationType === 'love' && (
-                <>
-                  {[...Array(20)].map((_, i) => (
-                      <div key={i} className="absolute text-5xl animate-float-up" style={{ left: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 0.5}s` }}>
-                          ❤️
-                      </div>
-                  ))}
-                </>
-            )}
-            {animationType === 'kiss' && (
-                 <>
-                 {[...Array(15)].map((_, i) => (
-                     <div key={i} className="absolute text-5xl animate-float-up" style={{ left: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 0.5}s` }}>
-                         💋
-                     </div>
-                 ))}
-               </>
-            )}
-             {animationType === 'hug' && (
-                 <div className="absolute inset-0 bg-orange-100/30 flex items-center justify-center animate-sun-pulse">
-                     <Smile size={200} className="text-orange-500 fill-orange-200" />
-                 </div>
-            )}
-             {animationType === 'poke' && (
-                <div className="text-9xl animate-bounce">
-                    👉
-                </div>
-             )}
-        </div>
-    );
-  };
 
   // 1. Name Entry Modal
   if (showNameModal) {
@@ -398,7 +338,6 @@ const App: React.FC = () => {
   return (
     <div className="h-[100dvh] p-4 flex flex-col max-w-md md:max-w-2xl mx-auto relative overflow-hidden">
       <BackgroundDoodles />
-      <InteractionOverlay />
       
       {/* Header */}
       <header className="relative z-20 flex justify-between items-center mb-4 bg-white p-3 rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] shrink-0">
@@ -542,6 +481,14 @@ const App: React.FC = () => {
         )}
 
       </main>
+
+      {/* Persistent Interaction Pop-up (Only shows when on ME tab) */}
+      {activeTab === 'me' && myState.pendingInteraction && (
+          <InteractionModal 
+            interaction={myState.pendingInteraction} 
+            onDismiss={handleDismissInteraction}
+          />
+      )}
 
       {/* Floating Action Button */}
       {(roomData.guestId) && (

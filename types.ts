@@ -23,6 +23,7 @@ export type InteractionType = 'hug' | 'kiss' | 'love' | 'poke';
 export interface Interaction {
   type: InteractionType;
   senderId: string;
+  senderName: string; // Added name so we can display it easily
   timestamp: number;
 }
 
@@ -32,6 +33,7 @@ export interface UserState {
   note: string;
   socialBattery: number; // 0-100
   lastUpdated: number; // Timestamp
+  pendingInteraction?: Interaction | null; // The notification waiting for this user
 }
 
 export interface MoodEntry {
@@ -52,7 +54,7 @@ export interface RoomData {
   hostState: UserState;
   guestState: UserState;
   createdAt: number;
-  lastInteraction?: Interaction;
+  lastInteraction?: Interaction; // Kept for legacy or global effects if needed
   logs: MoodEntry[];
 }
 
