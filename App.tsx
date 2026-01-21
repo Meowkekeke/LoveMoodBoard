@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X } from 'lucide-react';
+import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles } from 'lucide-react';
 import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, updateSocialBattery, clearUserLogs, deleteRoom } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
@@ -157,7 +157,18 @@ const App: React.FC = () => {
 
   const handleInteraction = async (type: InteractionType) => {
       if (!roomCode) return;
+      
+      const messages: Record<InteractionType, string> = {
+          hug: 'hugs you 🤗',
+          kiss: 'kisses you 💋',
+          poke: 'pokes you 👉',
+          love: 'loves you ❤️'
+      };
+
       try {
+          // 1. Post a persistent note
+          await logMood(roomCode, userId, userName, null, messages[type], { category: 'needs', icon: 'Heart' });
+          // 2. Trigger animation
           await sendInteraction(roomCode, userId, type);
       } catch (err) {
           console.error(err);
@@ -239,18 +250,18 @@ const App: React.FC = () => {
                   ))}
                 </>
             )}
-            {animationType === 'water' && (
+            {animationType === 'kiss' && (
                  <>
-                 {[...Array(30)].map((_, i) => (
-                     <div key={i} className="absolute text-4xl animate-rain" style={{ left: `${Math.random() * 100}%`, top: '-10%', animationDelay: `${Math.random()}s` }}>
-                         💧
+                 {[...Array(15)].map((_, i) => (
+                     <div key={i} className="absolute text-5xl animate-float-up" style={{ left: `${Math.random() * 100}%`, animationDelay: `${Math.random() * 0.5}s` }}>
+                         💋
                      </div>
                  ))}
                </>
             )}
-             {animationType === 'sun' && (
-                 <div className="absolute inset-0 bg-yellow-100/50 flex items-center justify-center animate-sun-pulse">
-                     <Sun size={200} className="text-yellow-500 fill-yellow-300" />
+             {animationType === 'hug' && (
+                 <div className="absolute inset-0 bg-orange-100/30 flex items-center justify-center animate-sun-pulse">
+                     <Smile size={200} className="text-orange-500 fill-orange-200" />
                  </div>
             )}
              {animationType === 'poke' && (
@@ -471,12 +482,9 @@ const App: React.FC = () => {
                         level={partnerState.socialBattery || 80} 
                         readOnly={true}
                      />
-                     <div className="mt-2">
-                         <InteractionBar onInteract={handleInteraction} disabled={false} />
-                     </div>
                   </div>
                   
-                  <div className="flex-1 overflow-y-auto px-1 space-y-4">
+                  <div className="flex-1 overflow-y-auto px-1 space-y-4 mb-4">
                     {partnerLogs.length === 0 ? (
                         <div className="text-center py-10 opacity-60">
                             <p className="font-bold text-xl">Partner hasn't posted yet.</p>
@@ -499,6 +507,9 @@ const App: React.FC = () => {
                         ))
                     )}
                   </div>
+                  
+                  {/* Bottom Interaction Bar */}
+                  <InteractionBar onInteract={handleInteraction} disabled={false} />
                 </>
              ) : (
                 <div className="bg-white p-8 rounded-3xl border-4 border-black border-dashed text-center">

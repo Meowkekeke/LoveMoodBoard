@@ -18,7 +18,7 @@ export enum Mood {
   STRESSED = 'stressed'
 }
 
-export type InteractionType = 'water' | 'sun' | 'love' | 'poke';
+export type InteractionType = 'hug' | 'kiss' | 'love' | 'poke';
 
 export interface Interaction {
   type: InteractionType;
