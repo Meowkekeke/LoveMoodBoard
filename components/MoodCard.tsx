@@ -16,7 +16,8 @@ const IconMap: Record<string, React.FC<any>> = {
 };
 
 interface MoodData {
-  name: string;
+  userName: string; // Changed from 'name' to 'userName' to match DB type
+  userId?: string; // Added for reference if needed
   type: 'mood' | 'action' | 'conversation';
   mood?: Mood;
   icon?: string;
@@ -65,12 +66,13 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe, isShared = false
 
   // Deterministic "random" styles
   const style = useMemo(() => {
-    const hash = data.name.length + data.note.length + data.timestamp;
+    // Use userName instead of name
+    const hash = (data.userName || '').length + (data.note || '').length + data.timestamp;
     const rotations = ['rotate-1', '-rotate-1', 'rotate-2', '-rotate-2', 'rotate-0'];
     return {
       rotation: rotations[hash % rotations.length],
     };
-  }, [data.note, data.timestamp, data.name]);
+  }, [data.note, data.timestamp, data.userName]);
 
   const hasMessages = data.messages && data.messages.length > 0;
   

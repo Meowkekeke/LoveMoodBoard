@@ -2,12 +2,12 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#f7fee7" />
     
     <!-- iOS PWA settings -->
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="LoveSync">
     <link rel="apple-touch-icon" href="/icon-192.png">
 
@@ -33,6 +33,17 @@
       
       h1, h2, h3, .handwritten {
         font-family: 'Patrick Hand', cursive;
+      }
+
+      /* Safe Area Utilities */
+      .pt-safe-top {
+        padding-top: env(safe-area-inset-top, 20px);
+      }
+      .pb-safe-bottom {
+        padding-bottom: env(safe-area-inset-bottom, 20px);
+      }
+      .pb-safe-area-plus-24 {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6rem);
       }
 
       /* Custom scrollbar */
