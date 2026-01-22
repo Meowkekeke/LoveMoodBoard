@@ -23,10 +23,10 @@ export const MoodEditor: React.FC<MoodEditorProps> = ({ currentMood, currentNote
 
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[#fffbeb] w-full max-w-sm rounded-[2.5rem] border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-6 relative overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-[#fffbeb] w-full max-w-sm h-full max-h-[85vh] rounded-[2.5rem] border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-6 relative overflow-hidden flex flex-col">
         
         {/* Header */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-4 shrink-0">
             <h2 className="text-2xl font-bold flex items-center gap-2">
                 <Sparkles className="text-[#fde047] fill-current" size={24} />
                 How are you?
@@ -42,7 +42,7 @@ export const MoodEditor: React.FC<MoodEditorProps> = ({ currentMood, currentNote
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
           
           {/* 1. Category Tabs */}
-          <div className="flex gap-2 mb-4 p-1 bg-black/5 rounded-2xl">
+          <div className="flex gap-2 mb-4 p-1 bg-black/5 rounded-2xl shrink-0">
             {(Object.keys(MOOD_CATEGORIES) as MoodCategory[]).map((cat) => {
                 const isActive = selectedCategory === cat;
                 const categoryData = MOOD_CATEGORIES[cat];
@@ -67,15 +67,15 @@ export const MoodEditor: React.FC<MoodEditorProps> = ({ currentMood, currentNote
           </div>
 
           {/* 2. Mood Grid (Scrollable) */}
-          <div className="flex-1 overflow-y-auto pr-1 mb-4">
-             <div className="grid grid-cols-3 gap-3">
+          <div className="flex-1 overflow-y-auto pr-1 mb-4 scrollbar-thin">
+             <div className="grid grid-cols-3 gap-3 pb-2">
                 {MOOD_CATEGORIES[selectedCategory].moods.map((mood) => (
                     <button
                         key={mood}
                         type="button"
                         onClick={() => setSelectedMood(mood)}
                         className={`
-                        aspect-square flex flex-col items-center justify-center rounded-2xl border-2 transition-all duration-200 relative overflow-hidden
+                        aspect-square flex flex-col items-center justify-center rounded-2xl border-2 transition-all duration-200 relative overflow-hidden touch-manipulation
                         ${selectedMood === mood 
                             ? `border-black ${MOOD_COLORS[mood]} scale-95 ring-4 ring-black/10` 
                             : 'border-black/10 hover:border-black/30 hover:bg-white bg-white/50'
@@ -96,15 +96,16 @@ export const MoodEditor: React.FC<MoodEditorProps> = ({ currentMood, currentNote
           </div>
 
           {/* 3. Note & Save */}
-          <div className="space-y-4 pt-4 border-t-2 border-black/10">
+          <div className="space-y-4 pt-4 border-t-2 border-black/10 shrink-0">
             <div className="relative">
                 <textarea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                className="w-full p-3 pr-12 border-2 border-black rounded-xl resize-none focus:outline-none focus:ring-4 ring-[#86efac]/30 text-lg font-[Patrick_Hand] bg-white shadow-inner"
+                className="w-full p-3 pr-12 border-2 border-black rounded-xl resize-none focus:outline-none focus:ring-4 ring-[#86efac]/30 text-base font-[Patrick_Hand] bg-white shadow-inner"
                 rows={2}
                 placeholder="Add a note... ✏️"
                 maxLength={60}
+                style={{ fontSize: '16px' }} // Prevent iOS zoom
                 />
                 <div className="absolute bottom-2 right-2 text-xs font-bold text-gray-300">
                     {note.length}/60

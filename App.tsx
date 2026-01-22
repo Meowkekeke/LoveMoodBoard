@@ -71,7 +71,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Subscription Effect
+  // Subscription Effect - CRITICAL FIX: Only depend on roomCode
   useEffect(() => {
     if (!roomCode) return;
 
@@ -87,17 +87,36 @@ const App: React.FC = () => {
       setRoomData(data);
     });
 
-    const interval = setInterval(() => {
-        if (roomData && roomCode) {
-            checkAndEndSpaceMode(roomData, roomCode);
-        }
-    }, 60000);
-
     return () => {
         unsubscribe();
-        clearInterval(interval);
     }
-  }, [roomCode, userId, roomData]); 
+  }, [roomCode]); 
+
+  // Space Mode Expiry Check - Optimized
+  useEffect(() => {
+    if (!roomData?.spaceMode?.isActive || !roomCode) return;
+
+    const endTime = roomData.spaceMode.endTime;
+    const now = Date.now();
+    const timeLeft = endTime - now;
+
+    // Helper to end space mode
+    const tryEndSpaceMode = () => {
+        // Only allow Host to trigger the DB update to prevent race conditions/double writes
+        // unless host is absent, but keeping it simple for now.
+        if (roomData.hostId === userId) {
+            checkAndEndSpaceMode(roomData, roomCode);
+        }
+    };
+
+    if (timeLeft <= 0) {
+        tryEndSpaceMode();
+    } else {
+        const timer = setTimeout(tryEndSpaceMode, timeLeft + 500); // +500ms buffer
+        return () => clearTimeout(timer);
+    }
+  }, [roomData?.spaceMode?.isActive, roomData?.spaceMode?.endTime, roomCode, userId]);
+
 
   // Notification Logic
   useEffect(() => {
@@ -106,27 +125,40 @@ const App: React.FC = () => {
     const isSpaceActive = roomData.spaceMode?.isActive && (roomData.spaceMode.endTime > Date.now());
     const amITakingSpace = isSpaceActive && roomData.spaceMode?.initiatorId === userId;
     
+    // If I am taking space, I don't need notifications about new logs, 
+    // but I should update the ref so when I come back I don't get flooded.
     if (amITakingSpace) {
         prevLogsLength.current = roomData.logs.length;
+        // Also update interaction timestamp so we don't get pinged
+        const myData = roomData.hostId === userId ? roomData.hostState : roomData.guestState;
+        if (myData.pendingInteraction) {
+            prevInteractionTimestamp.current = myData.pendingInteraction.timestamp;
+        }
         return;
     }
 
+    // New Logs Notification
     if (roomData.logs.length > prevLogsLength.current) {
         const newLog = roomData.logs[roomData.logs.length - 1];
+        // Only notify if it's not my own log
         if (newLog.userId !== userId && newLog.userId !== 'SHARED') {
             sendNotification('New Note 🌱', `${newLog.userName}: ${newLog.note}`);
+        } else if (newLog.userId === 'SHARED' && newLog.type === 'conversation' && !isChatMinimized) {
+            // Optional: Notify for conversation logs if minimized? 
+            // For now, let's keep it simple.
         }
     }
     prevLogsLength.current = roomData.logs.length;
 
-    const myData = roomData.hostId === userId ? roomData.hostState : roomData.guestState;
-    if (myData.pendingInteraction) {
-        if (myData.pendingInteraction.timestamp > prevInteractionTimestamp.current) {
-            sendNotification('New Love! ❤️', `${myData.pendingInteraction.senderName} sent a ${myData.pendingInteraction.type}!`);
-            prevInteractionTimestamp.current = myData.pendingInteraction.timestamp;
+    // Interaction Notification
+    const myState = roomData.hostId === userId ? roomData.hostState : roomData.guestState;
+    if (myState.pendingInteraction) {
+        if (myState.pendingInteraction.timestamp > prevInteractionTimestamp.current) {
+            sendNotification('New Love! ❤️', `${myState.pendingInteraction.senderName} sent a ${myState.pendingInteraction.type}!`);
+            prevInteractionTimestamp.current = myState.pendingInteraction.timestamp;
         }
     }
-  }, [roomData, userId]);
+  }, [roomData, userId]); // Keep roomData here as we explicitly want to react to data changes
 
 
   useEffect(() => {
@@ -409,8 +441,8 @@ const App: React.FC = () => {
       ) : (
       <>
         {/* Header */}
-        <header className="relative z-20 bg-white/90 backdrop-blur-sm pt-10 pb-2 px-4 shadow-sm border-b-2 border-green-100 shrink-0 rounded-b-2xl">
-            <div className="flex justify-between items-center mb-4">
+        <header className="relative z-20 bg-white/90 backdrop-blur-sm pt-safe-top pb-2 px-4 shadow-sm border-b-2 border-green-100 shrink-0 rounded-b-2xl mt-4 md:mt-0">
+            <div className="flex justify-between items-center mb-4 pt-2">
                 <div className="flex items-center gap-2">
                     <div className="bg-green-100 p-1.5 rounded-lg border-2 border-green-200">
                         <Sprout className="text-green-600 w-5 h-5" />
@@ -422,7 +454,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-1">
                     {!roomData.guestId && <button onClick={copyCode} className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-lg flex items-center gap-1 border border-yellow-200"><Copy size={12} /> {roomCode}</button>}
-                    <button onClick={() => setShowSettings(true)} className="p-2 text-gray-400 hover:text-gray-600"><Settings size={20} /></button>
+                    <button onClick={() => setShowSettings(true)} className="p-2 text-gray-400 hover:text-gray-600 active:scale-95 transition-transform"><Settings size={20} /></button>
                 </div>
             </div>
 
@@ -445,13 +477,13 @@ const App: React.FC = () => {
         <nav className="relative z-20 flex px-4 pt-4 shrink-0">
             <button 
                 onClick={() => setActiveTab('me')}
-                className={`flex-1 pb-3 text-center font-bold text-lg transition-colors border-b-4 ${activeTab === 'me' ? 'border-black text-black' : 'border-transparent text-gray-400/70'}`}
+                className={`flex-1 pb-3 text-center font-bold text-lg transition-colors border-b-4 select-none touch-manipulation ${activeTab === 'me' ? 'border-black text-black' : 'border-transparent text-gray-400/70'}`}
             >
                 My Journal
             </button>
             <button 
                 onClick={() => setActiveTab('partner')}
-                className={`flex-1 pb-3 text-center font-bold text-lg transition-colors border-b-4 ${activeTab === 'partner' ? 'border-black text-black' : 'border-transparent text-gray-400/70'}`}
+                className={`flex-1 pb-3 text-center font-bold text-lg transition-colors border-b-4 select-none touch-manipulation ${activeTab === 'partner' ? 'border-black text-black' : 'border-transparent text-gray-400/70'}`}
             >
                 {partnerName}
             </button>
@@ -460,7 +492,7 @@ const App: React.FC = () => {
         {/* Main Content Feed */}
         <main className="flex-1 flex flex-col relative z-10 min-h-0">
             {activeTab === 'me' ? (
-                <div className="flex-1 overflow-y-auto px-4 py-6 pb-24 space-y-6">
+                <div className="flex-1 overflow-y-auto px-4 py-6 pb-24 space-y-6 overscroll-contain">
                     {myLogs.length === 0 ? (
                          <div className="text-center mt-10 p-8 bg-white/60 backdrop-blur-sm rounded-3xl border-2 border-dashed border-gray-300">
                              <h3 className="text-xl font-bold text-gray-500 mb-2 font-[Patrick_Hand]">Your journal is empty</h3>
@@ -473,7 +505,7 @@ const App: React.FC = () => {
                     )}
                 </div>
             ) : (
-                <div className="flex-1 overflow-y-auto px-4 py-6 pb-24 space-y-6">
+                <div className="flex-1 overflow-y-auto px-4 py-6 pb-24 space-y-6 overscroll-contain">
                     {!roomData.guestId ? (
                         <div className="mt-10 p-6 bg-yellow-50/90 rounded-2xl border-2 border-yellow-200 text-center shadow-sm">
                             <p className="font-bold text-yellow-800">Share code <span className="font-mono bg-white px-1 rounded">{roomCode}</span> to connect.</p>
@@ -519,7 +551,7 @@ const App: React.FC = () => {
           <div className="fixed bottom-6 right-6 z-40">
             <button 
                 onClick={() => setIsMenuOpen(true)}
-                className="w-16 h-16 bg-[#1a1a1a] text-white rounded-[2rem] shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all border-2 border-white/20"
+                className="w-16 h-16 bg-[#1a1a1a] text-white rounded-[2rem] shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all border-2 border-white/20 touch-manipulation"
             >
                 <Plus size={32} strokeWidth={3} />
             </button>
