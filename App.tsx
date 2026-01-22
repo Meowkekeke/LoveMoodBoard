@@ -490,7 +490,8 @@ const App: React.FC = () => {
                                 timestamp: log.timestamp,
                                 messages: log.messages
                             }}
-                            isMe={log.userId === userId} // Shared logs will be false, so no "YOU" badge
+                            isMe={log.userId === userId} // Shared logs will be false, so no "YOU" badge if logic was strict, but we handle below
+                            isShared={log.userId === 'SHARED'}
                         />
                     ))
                 )}
@@ -530,6 +531,7 @@ const App: React.FC = () => {
                                     messages: log.messages
                                 }}
                                 isMe={false}
+                                isShared={log.userId === 'SHARED'}
                             />
                         ))
                     )}

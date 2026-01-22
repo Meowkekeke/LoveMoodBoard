@@ -257,15 +257,16 @@ export const endConversation = async (code: string) => {
     // This allows us to REPLACE the original log with the conversation log
     const logIndex = logs.findIndex(l => l.id === sourceId);
 
-    // If we found the source log and there are messages, update it
-    if (logIndex !== -1 && data.messages && data.messages.length > 0) {
+    // If we found the source log, update it regardless of message count 
+    // (This handles the "Talked IRL -> We're Good" flow where chat might be empty)
+    if (logIndex !== -1) {
         const updatedLog = { ...logs[logIndex] };
         
         // Transform into shared conversation
         updatedLog.type = 'conversation';
         updatedLog.userId = 'SHARED'; // Visible to both
         updatedLog.userName = title; // 'Heart-to-Heart' or 'Game Plan'
-        updatedLog.messages = data.messages;
+        updatedLog.messages = data.messages || [];
         
         // Note: we keep the original updatedLog.note (e.g. "Bad Meeting • I need space") 
         // as the subtitle/topic of the conversation card.
@@ -297,12 +298,14 @@ export const endConversation = async (code: string) => {
         conversationActive: false,
         messages: [],
         conversationTopic: '',
-        logs: arrayUnion(archiveEntry)
+        logs: arrayUnion(archiveEntry),
+        conversationSourceLogId: null
       });
     } else {
-      // Just close if empty (no messages logged)
+      // Just close if empty and no source log to patch
       await updateDoc(roomRef, {
-        conversationActive: false
+        conversationActive: false,
+        conversationSourceLogId: null
       });
     }
   }

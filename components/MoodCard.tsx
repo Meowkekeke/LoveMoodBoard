@@ -29,9 +29,10 @@ interface MoodData {
 interface MoodCardProps {
   data: MoodData;
   isMe: boolean;
+  isShared?: boolean;
 }
 
-export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe }) => {
+export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe, isShared = false }) => {
   const [expanded, setExpanded] = useState(false);
   
   let bgColor = 'bg-white';
@@ -76,6 +77,8 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe }) => {
     };
   }, [data.note, data.timestamp, data.name]);
 
+  const hasMessages = data.messages && data.messages.length > 0;
+
   return (
     <div className={`relative group w-full max-w-md mx-auto mb-6 ${style.rotation} transition-transform hover:scale-[1.01] hover:z-10`}>
        {/* Tape */}
@@ -91,9 +94,14 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe }) => {
           <div className="flex w-full min-h-[110px]">
             {/* LHS: Icon Area */}
             <div className={`w-[30%] min-w-[85px] ${bgColor} border-r-4 border-black flex flex-col items-center justify-center p-3 relative`}>
-                {isMe && (
+                {isMe && !isShared && (
                   <div className="absolute top-2 left-2 bg-black text-white text-[10px] px-2 py-0.5 rounded-full font-bold tracking-widest z-10 -rotate-12 shadow-sm">
                     YOU
+                  </div>
+                )}
+                {isShared && (
+                  <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold tracking-widest z-10 -rotate-12 shadow-sm">
+                    US
                   </div>
                 )}
                 <div className="transform transition-transform group-hover:scale-110 group-hover:rotate-6 duration-300 drop-shadow-sm">
@@ -121,7 +129,7 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe }) => {
                 </div>
 
                 {/* Expansion for Conversation */}
-                {data.type === 'conversation' && data.messages && (
+                {data.type === 'conversation' && hasMessages && (
                   <button 
                     onClick={() => setExpanded(!expanded)}
                     className="mt-3 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-blue-600 hover:text-blue-800 transition-colors"
@@ -130,6 +138,12 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe }) => {
                     {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
                 )}
+                
+                {data.type === 'conversation' && !hasMessages && (
+                    <span className="mt-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        Resolved offline
+                    </span>
+                )}
             </div>
           </div>
 
@@ -137,9 +151,9 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe }) => {
           {expanded && data.messages && (
             <div className="bg-gray-50 border-t-4 border-black p-4 space-y-3 max-h-60 overflow-y-auto">
                {data.messages.map(msg => (
-                 <div key={msg.id} className={`flex flex-col ${msg.senderId === data.userId ? 'items-end' : 'items-start'}`}>
+                 <div key={msg.id} className={`flex flex-col ${msg.senderId === data.userId ? 'items-end' : (msg.senderName ? 'items-start' : 'items-start')}`}>
                     <span className="text-[10px] font-bold text-gray-400 mb-0.5">{msg.senderName}</span>
-                    <div className={`px-3 py-2 rounded-xl text-sm font-[Patrick_Hand] ${msg.senderId === data.userId ? 'bg-blue-100 text-blue-900 rounded-tr-none' : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none'}`}>
+                    <div className="px-3 py-2 rounded-xl text-sm font-[Patrick_Hand] bg-white border border-gray-200 text-gray-800">
                       {msg.text}
                     </div>
                  </div>
