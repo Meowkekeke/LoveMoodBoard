@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { X, Clock, Ghost } from 'lucide-react';
-import { DoodleButton } from './DoodleButton';
 
 interface SpaceDurationModalProps {
   onSelectDuration: (minutes: number, reason: string) => void;
@@ -17,9 +16,11 @@ export const SpaceDurationModal: React.FC<SpaceDurationModalProps> = ({ onSelect
     { label: '2 Hours', value: 120 },
   ];
 
+  const isValid = reason.trim().length > 0;
+
   const handleSelect = (minutes: number) => {
-      const finalReason = reason.trim() || "Just need a moment";
-      onSelectDuration(minutes, finalReason);
+      if (!isValid) return;
+      onSelectDuration(minutes, reason.trim());
   };
 
   return (
@@ -52,7 +53,13 @@ export const SpaceDurationModal: React.FC<SpaceDurationModalProps> = ({ onSelect
                 className="w-full p-4 border-4 border-black rounded-2xl bg-white focus:outline-none focus:ring-4 ring-gray-200 font-[Patrick_Hand] text-lg resize-none"
                 rows={2}
                 maxLength={60}
+                autoFocus
             />
+            {!isValid && (
+              <p className="text-xs text-red-500 font-bold mt-2 animate-pulse">
+                * Please write a reason to continue
+              </p>
+            )}
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -60,10 +67,17 @@ export const SpaceDurationModal: React.FC<SpaceDurationModalProps> = ({ onSelect
             <button
               key={dur.value}
               onClick={() => handleSelect(dur.value)}
-              className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-black/10 bg-white hover:border-black hover:bg-[#f3f4f6] transition-all active:scale-95 shadow-sm"
+              disabled={!isValid}
+              className={`
+                flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all shadow-sm
+                ${isValid 
+                   ? 'border-black/10 bg-white hover:border-black hover:bg-[#f3f4f6] active:scale-95 cursor-pointer' 
+                   : 'border-transparent bg-gray-200 opacity-50 cursor-not-allowed grayscale'
+                }
+              `}
             >
-              <Clock size={32} className="text-gray-400 mb-2" />
-              <span className="font-bold text-xl text-gray-800">{dur.label}</span>
+              <Clock size={32} className={`${isValid ? 'text-gray-400' : 'text-gray-300'} mb-2`} />
+              <span className={`font-bold text-xl ${isValid ? 'text-gray-800' : 'text-gray-400'}`}>{dur.label}</span>
             </button>
           ))}
         </div>
