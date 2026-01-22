@@ -736,13 +736,14 @@ const App: React.FC = () => {
       {/* Floating Action Buttons */}
       {(roomData.guestId && (!roomData.conversationActive || isChatMinimized)) && (
           <div className="fixed bottom-6 right-6 z-40 flex items-end gap-3">
-             {/* Space Button */}
+             {/* Space Button - Pill Shape */}
              <button
                 onClick={() => setShowSpaceDuration(true)}
-                className="w-12 h-12 bg-gray-100 border-4 border-black rounded-full shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:bg-gray-200 active:translate-y-1 active:shadow-none transition-all"
+                className="h-12 px-4 bg-white border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2 hover:bg-gray-50 active:translate-y-1 active:shadow-none transition-all group mr-1"
                 title="I need space"
             >
-                <Ghost size={20} className="text-gray-500" />
+                <Ghost size={20} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
+                <span className="font-bold text-gray-600 group-hover:text-black">Need Space</span>
             </button>
 
             {/* Main Add Button */}
