@@ -3,7 +3,7 @@ import { DoodleButton } from './DoodleButton';
 import { Ghost, Heart, MessageCircle, Lightbulb, X } from 'lucide-react';
 
 interface RoughFollowUpModalProps {
-  onSelect: (need: string) => void;
+  onSelect: (needId: string, needLabel: string) => void;
   onCancel: () => void;
 }
 
@@ -33,7 +33,7 @@ export const RoughFollowUpModal: React.FC<RoughFollowUpModalProps> = ({ onSelect
           {options.map((opt) => (
             <button
               key={opt.id}
-              onClick={() => onSelect(opt.label)}
+              onClick={() => onSelect(opt.id, opt.label)}
               className={`flex items-center gap-4 p-4 rounded-2xl border-2 border-black/10 transition-all active:scale-98 active:border-black ${opt.color} text-left group`}
             >
               <div className="bg-white p-2 rounded-full border-2 border-black shadow-sm group-hover:scale-110 transition-transform">

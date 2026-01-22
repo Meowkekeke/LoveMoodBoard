@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles, MessageCircle } from 'lucide-react';
-import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom, startConversation } from './services/db';
+import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom, startConversation, activateSpaceMode, checkAndEndSpaceMode } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
 import { MoodEditor } from './components/MoodEditor';
@@ -11,6 +11,8 @@ import { InteractionModal } from './components/InteractionModal';
 import { SentFeedbackModal } from './components/SentFeedbackModal';
 import { RoughFollowUpModal } from './components/RoughFollowUpModal';
 import { ConversationZone } from './components/ConversationZone';
+import { SpaceDurationModal } from './components/SpaceDurationModal';
+import { SpaceCountdown } from './components/SpaceCountdown';
 
 // Utility for persistent User ID
 const getUserId = () => {
@@ -45,6 +47,7 @@ const App: React.FC = () => {
   
   // State for Rough Follow-up
   const [pendingRoughLog, setPendingRoughLog] = useState<{ icon: string; label: string } | null>(null);
+  const [showSpaceDuration, setShowSpaceDuration] = useState(false);
 
   // Subscription Effect
   useEffect(() => {
@@ -63,8 +66,18 @@ const App: React.FC = () => {
       setRoomData(data);
     });
 
-    return () => unsubscribe();
-  }, [roomCode, userId]);
+    // Clean up expired space modes locally/periodically
+    const interval = setInterval(() => {
+        if (roomData && roomCode) {
+            checkAndEndSpaceMode(roomData, roomCode);
+        }
+    }, 60000);
+
+    return () => {
+        unsubscribe();
+        clearInterval(interval);
+    }
+  }, [roomCode, userId, roomData]); // Added roomData to dep array for interval check (less efficient but ensures fresh data passed)
 
   // Reset minimized state if conversation actually ends or new one starts
   useEffect(() => {
@@ -72,6 +85,12 @@ const App: React.FC = () => {
         setIsChatMinimized(false);
     }
   }, [roomData?.conversationActive]);
+
+  // Derived Data for Space Mode
+  const isSpaceActive = roomData?.spaceMode?.isActive && (roomData.spaceMode.endTime > Date.now());
+  const amITakingSpace = isSpaceActive && roomData?.spaceMode?.initiatorId === userId;
+  const isPartnerTakingSpace = isSpaceActive && !amITakingSpace;
+
 
   // Actions
   const handleCreateRoom = async () => {
@@ -156,24 +175,40 @@ const App: React.FC = () => {
     }
   };
 
-  const handleRoughCompletion = async (need: string) => {
+  const handleRoughCompletion = async (needId: string, needLabel: string) => {
     if (!roomCode || !pendingRoughLog) return;
     
+    // SPECIAL CASE: SPACE MODE
+    if (needId === 'space') {
+        setShowSpaceDuration(true);
+        // We keep pendingRoughLog to use its icon, but we don't clear it yet
+        return;
+    }
+
     try {
-      // Combine the original label (e.g., "Bad Meeting") with the specific need
-      const combinedNote = `${pendingRoughLog.label} • ${need}`;
+      const combinedNote = `${pendingRoughLog.label} • ${needLabel}`;
       
-      // Log it first
       const logId = await logMood(roomCode, userId, userName, null, combinedNote, { category: 'rough', icon: pendingRoughLog.icon });
       setPendingRoughLog(null);
 
-      // Trigger Conversation passing the log ID to source it
+      // Trigger Conversation
       await startConversation(roomCode, `${userName} is having a rough time: ${combinedNote}`, 'rough', logId);
-      setIsChatMinimized(false); // Ensure chat opens
+      setIsChatMinimized(false);
 
     } catch (err) {
       console.error("Failed to log rough action", err);
     }
+  };
+
+  const handleStartSpaceMode = async (minutes: number) => {
+     if (!roomCode || !pendingRoughLog) return;
+     try {
+         await activateSpaceMode(roomCode, userId, userName, minutes);
+         setPendingRoughLog(null);
+         setShowSpaceDuration(false);
+     } catch (err) {
+         console.error("Failed to start space mode", err);
+     }
   };
 
   const handleBatteryUpdate = async (level: number) => {
@@ -513,38 +548,51 @@ const App: React.FC = () => {
           <section className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
              {roomData.guestId ? (
                 <>
-                  <div className="mb-4 shrink-0">
-                     <SocialBattery 
-                        level={partnerState.socialBattery || 80} 
-                        readOnly={true}
-                     />
-                  </div>
-                  
-                  <div className="flex-1 overflow-y-auto px-4 space-y-6 pb-24">
-                    {partnerLogs.length === 0 ? (
-                        <div className="text-center py-10 opacity-60">
-                            <p className="font-bold text-xl">{partnerTabLabel} hasn't posted yet.</p>
-                        </div>
-                    ) : (
-                        partnerLogs.map(log => (
-                            <MoodCard 
-                                key={log.id} 
-                                data={{
-                                    name: log.userName,
-                                    type: log.type,
-                                    mood: log.mood,
-                                    category: log.category,
-                                    icon: log.icon,
-                                    note: log.note,
-                                    timestamp: log.timestamp,
-                                    messages: log.messages
-                                }}
-                                isMe={false}
-                                isShared={log.userId === 'SHARED'}
+                  {/* If Space Mode is active, handle blocking/showing timer */}
+                  {isSpaceActive ? (
+                      <div className="flex-1 flex items-center justify-center p-4">
+                           <SpaceCountdown 
+                              endTime={roomData.spaceMode!.endTime} 
+                              initiatorName={roomData.spaceMode!.initiatorName}
+                              isMe={amITakingSpace}
+                           />
+                      </div>
+                  ) : (
+                    <>
+                        <div className="mb-4 shrink-0">
+                            <SocialBattery 
+                                level={partnerState.socialBattery || 80} 
+                                readOnly={true}
                             />
-                        ))
-                    )}
-                  </div>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto px-4 space-y-6 pb-24">
+                            {partnerLogs.length === 0 ? (
+                                <div className="text-center py-10 opacity-60">
+                                    <p className="font-bold text-xl">{partnerTabLabel} hasn't posted yet.</p>
+                                </div>
+                            ) : (
+                                partnerLogs.map(log => (
+                                    <MoodCard 
+                                        key={log.id} 
+                                        data={{
+                                            name: log.userName,
+                                            type: log.type,
+                                            mood: log.mood,
+                                            category: log.category,
+                                            icon: log.icon,
+                                            note: log.note,
+                                            timestamp: log.timestamp,
+                                            messages: log.messages
+                                        }}
+                                        isMe={false}
+                                        isShared={log.userId === 'SHARED'}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    </>
+                  )}
                 </>
              ) : (
                 <div className="bg-white p-8 rounded-3xl border-4 border-black border-dashed text-center">
@@ -559,7 +607,8 @@ const App: React.FC = () => {
       </main>
 
       {/* Persistent Interaction Pop-up (Only shows when on ME tab) - RECEIVER */}
-      {activeTab === 'me' && myState.pendingInteraction && (
+      {/* BLOCK INTERACTION if I am taking space */}
+      {activeTab === 'me' && myState.pendingInteraction && !amITakingSpace && (
           <InteractionModal 
             interaction={myState.pendingInteraction} 
             onDismiss={handleDismissInteraction}
@@ -582,9 +631,21 @@ const App: React.FC = () => {
           onCancel={() => setPendingRoughLog(null)}
         />
       )}
+
+      {/* Space Duration Modal */}
+      {showSpaceDuration && (
+        <SpaceDurationModal 
+            onSelectDuration={handleStartSpaceMode}
+            onCancel={() => setShowSpaceDuration(false)}
+        />
+      )}
       
       {/* CONVERSATION ZONE OVERLAY */}
-      {roomData.conversationActive && !isChatMinimized && (
+      {/* Don't show conversation if space mode is active? Or allow it? 
+          Requirement: "no matter what message the other person sends, the need space person cannot see it".
+          This implies chat should be hidden/suppressed for the space taker.
+      */}
+      {roomData.conversationActive && !isChatMinimized && !amITakingSpace && (
         <ConversationZone 
           roomCode={roomCode}
           userId={userId}
@@ -596,7 +657,7 @@ const App: React.FC = () => {
       )}
       
       {/* Minimized Chat Bubble */}
-      {roomData.conversationActive && isChatMinimized && (
+      {roomData.conversationActive && isChatMinimized && !amITakingSpace && (
          <div className="fixed bottom-6 left-6 z-40">
             <button 
               onClick={() => setIsChatMinimized(false)}
@@ -611,12 +672,7 @@ const App: React.FC = () => {
          </div>
       )}
 
-      {/* Floating Action Button - Only show if conversation NOT active (minimized or not, we might want to hide regular fab to focus on chat, OR show regular fab if minimized? 
-          Requirement: "it stays in a letter icon". Let's assume standard FAB can coexist if chat is minimized, OR hidden. 
-          Given the importance of the chat, let's keep FAB hidden if conversation is active to prioritize resolution, 
-          BUT if user minimized it, maybe they want to do other things. 
-          Let's SHOW FAB if minimized, hide if full screen.
-      */}
+      {/* Floating Action Button */}
       {(roomData.guestId && (!roomData.conversationActive || isChatMinimized)) && (
           <div className="fixed bottom-6 right-6 z-40">
             <button 

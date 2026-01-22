@@ -1,6 +1,6 @@
 import { doc, setDoc, getDoc, updateDoc, onSnapshot, Unsubscribe, arrayUnion, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import { RoomData, Mood, UserState, InteractionType, MoodEntry, ChatMessage } from '../types';
+import { RoomData, Mood, UserState, InteractionType, MoodEntry, ChatMessage, SpaceModeState } from '../types';
 
 const ROOM_COLLECTION = 'couple_rooms';
 
@@ -34,7 +34,8 @@ export const createRoom = async (userId: string, userName: string): Promise<stri
     createdAt: Date.now(),
     logs: [], // Initialize empty logs
     conversationActive: false,
-    messages: []
+    messages: [],
+    spaceMode: { isActive: false, initiatorId: '', initiatorName: '', endTime: 0 }
   };
 
   await setDoc(roomRef, initialData);
@@ -196,7 +197,8 @@ export const clearRoomLogs = async (code: string) => {
       'guestState.note': 'Fresh start! 🌱',
       'guestState.lastUpdated': Date.now(),
       conversationActive: false,
-      messages: []
+      messages: [],
+      spaceMode: { isActive: false, initiatorId: '', initiatorName: '', endTime: 0 }
     };
 
     await updateDoc(roomRef, updates);
@@ -206,6 +208,48 @@ export const clearRoomLogs = async (code: string) => {
 export const deleteRoom = async (code: string) => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
   await deleteDoc(roomRef);
+};
+
+// --- SPACE MODE ---
+
+export const activateSpaceMode = async (code: string, userId: string, userName: string, durationMinutes: number) => {
+  const roomRef = doc(db, ROOM_COLLECTION, code);
+  
+  const endTime = Date.now() + (durationMinutes * 60 * 1000);
+  
+  const spaceModeData: SpaceModeState = {
+    isActive: true,
+    initiatorId: userId,
+    initiatorName: userName,
+    endTime: endTime
+  };
+
+  // Log it as an action too so there is a record
+  const entryId = crypto.randomUUID();
+  const newEntry: MoodEntry = {
+    id: entryId,
+    userId,
+    userName,
+    type: 'action',
+    category: 'rough',
+    icon: 'Ghost',
+    note: `Taking space for ${durationMinutes}m`,
+    timestamp: Date.now()
+  };
+
+  await updateDoc(roomRef, {
+    spaceMode: spaceModeData,
+    logs: arrayUnion(newEntry)
+  });
+};
+
+export const checkAndEndSpaceMode = async (roomData: RoomData, code: string) => {
+    if (roomData.spaceMode?.isActive && Date.now() > roomData.spaceMode.endTime) {
+         const roomRef = doc(db, ROOM_COLLECTION, code);
+         await updateDoc(roomRef, {
+             'spaceMode.isActive': false
+         });
+    }
 };
 
 // --- CONVERSATION ZONE HELPERS ---

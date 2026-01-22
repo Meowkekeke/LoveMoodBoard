@@ -57,6 +57,13 @@ export interface MoodEntry {
   timestamp: number;
 }
 
+export interface SpaceModeState {
+  isActive: boolean;
+  initiatorId: string;
+  initiatorName: string;
+  endTime: number;
+}
+
 export interface RoomData {
   hostId: string;
   guestId?: string; // Optional until guest joins
@@ -72,6 +79,9 @@ export interface RoomData {
   conversationTrigger?: 'rough' | 'needs'; // Track source
   conversationSourceLogId?: string | null; // Track which log started this
   messages?: ChatMessage[];
+
+  // Space Mode State
+  spaceMode?: SpaceModeState;
 }
 
 export type MoodCategory = 'positive' | 'neutral' | 'negative';
