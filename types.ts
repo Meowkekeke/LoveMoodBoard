@@ -70,6 +70,7 @@ export interface RoomData {
   conversationActive?: boolean;
   conversationTopic?: string;
   conversationTrigger?: 'rough' | 'needs'; // Track source
+  conversationSourceLogId?: string | null; // Track which log started this
   messages?: ChatMessage[];
 }
 

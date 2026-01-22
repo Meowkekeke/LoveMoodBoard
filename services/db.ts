@@ -85,12 +85,14 @@ export const subscribeToRoom = (code: string, callback: (data: RoomData | null) 
   });
 };
 
-export const logMood = async (code: string, userId: string, userName: string, mood: Mood | null, note: string, actionConfig?: { category: 'self_care'|'rough'|'needs', icon: string }) => {
+export const logMood = async (code: string, userId: string, userName: string, mood: Mood | null, note: string, actionConfig?: { category: 'self_care'|'rough'|'needs', icon: string }): Promise<string> => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
   
+  const entryId = crypto.randomUUID();
+
   // Create object with only defined values to avoid Firestore "Unsupported field value: undefined" error
   const newEntry: MoodEntry = {
-    id: crypto.randomUUID(),
+    id: entryId,
     userId,
     userName,
     type: actionConfig ? 'action' : 'mood',
@@ -109,7 +111,7 @@ export const logMood = async (code: string, userId: string, userName: string, mo
 
   // We add to logs AND update the current state for backward compatibility/profile view
   const roomSnap = await getDoc(roomRef);
-  if (!roomSnap.exists()) return;
+  if (!roomSnap.exists()) return entryId;
   const data = roomSnap.data() as RoomData;
   const isHost = data.hostId === userId;
   const fieldPrefix = isHost ? 'hostState' : 'guestState';
@@ -126,6 +128,7 @@ export const logMood = async (code: string, userId: string, userName: string, mo
   }
 
   await updateDoc(roomRef, updates);
+  return entryId;
 };
 
 export const updateSocialBattery = async (code: string, userId: string, level: number) => {
@@ -207,12 +210,13 @@ export const deleteRoom = async (code: string) => {
 
 // --- CONVERSATION ZONE HELPERS ---
 
-export const startConversation = async (code: string, topic: string, trigger: 'rough' | 'needs' = 'needs') => {
+export const startConversation = async (code: string, topic: string, trigger: 'rough' | 'needs' = 'needs', sourceLogId?: string) => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
   await updateDoc(roomRef, {
     conversationActive: true,
     conversationTopic: topic,
     conversationTrigger: trigger,
+    conversationSourceLogId: sourceLogId || null,
     messages: [] // Reset messages for new topic
   });
 };
@@ -246,9 +250,40 @@ export const endConversation = async (code: string) => {
       title = 'Game Plan';
     }
 
-    // Only archive if there are messages
-    if (data.messages && data.messages.length > 0) {
-      const archiveEntry: MoodEntry = {
+    const logs = data.logs || [];
+    const sourceId = data.conversationSourceLogId;
+    
+    // Check if we can find the source log to patch
+    // This allows us to REPLACE the original log with the conversation log
+    const logIndex = logs.findIndex(l => l.id === sourceId);
+
+    // If we found the source log and there are messages, update it
+    if (logIndex !== -1 && data.messages && data.messages.length > 0) {
+        const updatedLog = { ...logs[logIndex] };
+        
+        // Transform into shared conversation
+        updatedLog.type = 'conversation';
+        updatedLog.userId = 'SHARED'; // Visible to both
+        updatedLog.userName = title; // 'Heart-to-Heart' or 'Game Plan'
+        updatedLog.messages = data.messages;
+        
+        // Note: we keep the original updatedLog.note (e.g. "Bad Meeting • I need space") 
+        // as the subtitle/topic of the conversation card.
+        
+        const newLogs = [...logs];
+        newLogs[logIndex] = updatedLog;
+        
+        await updateDoc(roomRef, {
+            logs: newLogs,
+            conversationActive: false,
+            messages: [],
+            conversationTopic: '',
+            conversationSourceLogId: null
+        });
+
+    } else if (data.messages && data.messages.length > 0) {
+       // Fallback: If source not found (legacy) but messages exist, create new entry
+       const archiveEntry: MoodEntry = {
         id: crypto.randomUUID(),
         userId: 'SHARED', // Special ID for shared logs
         userName: title, 
@@ -265,7 +300,7 @@ export const endConversation = async (code: string) => {
         logs: arrayUnion(archiveEntry)
       });
     } else {
-      // Just close if empty
+      // Just close if empty (no messages logged)
       await updateDoc(roomRef, {
         conversationActive: false
       });

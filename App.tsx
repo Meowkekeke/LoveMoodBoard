@@ -135,12 +135,13 @@ const App: React.FC = () => {
     }
 
     try {
-      await logMood(roomCode, userId, userName, null, label, { category, icon });
+      // Returns ID so we can patch it later if it becomes a conversation
+      const logId = await logMood(roomCode, userId, userName, null, label, { category, icon });
       
       // If category is NEEDS, start conversation immediately
       if (category === 'needs') {
         // TRIGGER TYPE: needs
-        await startConversation(roomCode, `${userName} posted: ${label}`, 'needs');
+        await startConversation(roomCode, `${userName} posted: ${label}`, 'needs', logId);
       }
     } catch (err) {
       console.error("Failed to log action", err);
@@ -153,12 +154,13 @@ const App: React.FC = () => {
     try {
       // Combine the original label (e.g., "Bad Meeting") with the specific need
       const combinedNote = `${pendingRoughLog.label} • ${need}`;
-      await logMood(roomCode, userId, userName, null, combinedNote, { category: 'rough', icon: pendingRoughLog.icon });
+      
+      // Log it first
+      const logId = await logMood(roomCode, userId, userName, null, combinedNote, { category: 'rough', icon: pendingRoughLog.icon });
       setPendingRoughLog(null);
 
-      // Trigger Conversation
-      // TRIGGER TYPE: rough
-      await startConversation(roomCode, `${userName} is having a rough time: ${combinedNote}`, 'rough');
+      // Trigger Conversation passing the log ID to source it
+      await startConversation(roomCode, `${userName} is having a rough time: ${combinedNote}`, 'rough', logId);
 
     } catch (err) {
       console.error("Failed to log rough action", err);
@@ -488,7 +490,7 @@ const App: React.FC = () => {
                                 timestamp: log.timestamp,
                                 messages: log.messages
                             }}
-                            isMe={log.userId === userId || log.userId === 'SHARED'} // Highlight shared as 'me' style or similar?
+                            isMe={log.userId === userId} // Shared logs will be false, so no "YOU" badge
                         />
                     ))
                 )}
