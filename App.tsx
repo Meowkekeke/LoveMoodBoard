@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles, MessageCircle } from 'lucide-react';
+import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles, MessageCircle, Bell } from 'lucide-react';
 import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom, startConversation, activateSpaceMode, checkAndEndSpaceMode } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
@@ -22,6 +22,21 @@ const getUserId = () => {
     localStorage.setItem('lovesync_uid', id);
   }
   return id;
+};
+
+// Utility for sending notifications
+const sendNotification = (title: string, body: string) => {
+  if (Notification.permission === 'granted') {
+    // Only send if document is hidden (user is in another tab or app is backgrounded)
+    // OR if on mobile where "background" might just mean "not interacting"
+    if (document.visibilityState === 'hidden') {
+       new Notification(title, {
+         body,
+         icon: '/icon-192.png', // Assuming icon exists
+         vibrate: [200, 100, 200]
+       } as any);
+    }
+  }
 };
 
 const App: React.FC = () => {
@@ -48,6 +63,17 @@ const App: React.FC = () => {
   // State for Rough Follow-up
   const [pendingRoughLog, setPendingRoughLog] = useState<{ icon: string; label: string } | null>(null);
   const [showSpaceDuration, setShowSpaceDuration] = useState(false);
+
+  // Refs for change detection (Notifications)
+  const prevLogsLength = useRef(0);
+  const prevInteractionTimestamp = useRef(0);
+
+  // Request Notification Permission on mount
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   // Subscription Effect
   useEffect(() => {
@@ -77,7 +103,44 @@ const App: React.FC = () => {
         unsubscribe();
         clearInterval(interval);
     }
-  }, [roomCode, userId, roomData]); // Added roomData to dep array for interval check (less efficient but ensures fresh data passed)
+  }, [roomCode, userId, roomData]); 
+
+  // Notification Logic Effect
+  useEffect(() => {
+    if (!roomData) return;
+    
+    // Check if I am taking space - if so, NO notifications
+    const isSpaceActive = roomData.spaceMode?.isActive && (roomData.spaceMode.endTime > Date.now());
+    const amITakingSpace = isSpaceActive && roomData.spaceMode?.initiatorId === userId;
+    
+    if (amITakingSpace) {
+        // Reset refs so we don't get blasted when space ends
+        prevLogsLength.current = roomData.logs.length;
+        return;
+    }
+
+    // 1. New Log Notification
+    if (roomData.logs.length > prevLogsLength.current) {
+        const newLog = roomData.logs[roomData.logs.length - 1];
+        // If it's not ME who posted, notify
+        if (newLog.userId !== userId && newLog.userId !== 'SHARED') {
+            sendNotification('New Note 🌱', `${newLog.userName}: ${newLog.note}`);
+        }
+    }
+    prevLogsLength.current = roomData.logs.length;
+
+    // 2. New Interaction Notification
+    // Check pending interaction for ME
+    const myData = roomData.hostId === userId ? roomData.hostState : roomData.guestState;
+    if (myData.pendingInteraction) {
+        if (myData.pendingInteraction.timestamp > prevInteractionTimestamp.current) {
+            sendNotification('New Love! ❤️', `${myData.pendingInteraction.senderName} sent a ${myData.pendingInteraction.type}!`);
+            prevInteractionTimestamp.current = myData.pendingInteraction.timestamp;
+        }
+    }
+
+  }, [roomData, userId]);
+
 
   // Reset minimized state if conversation actually ends or new one starts
   useEffect(() => {
@@ -326,6 +389,10 @@ const App: React.FC = () => {
       navigator.clipboard.writeText(roomCode);
       alert('Code copied to clipboard! Share it with your partner.');
     }
+  };
+
+  const enableNotifications = () => {
+      Notification.requestPermission();
   };
 
   // --- Render Logic ---
@@ -722,6 +789,14 @@ const App: React.FC = () => {
               </div>
 
               <div className="space-y-3">
+                <button 
+                    onClick={enableNotifications}
+                    className="w-full flex items-center justify-between p-4 bg-blue-50 border-4 border-blue-200 rounded-2xl hover:bg-blue-100 transition-colors group"
+                >
+                    <span className="font-bold text-blue-800">Enable Notifications</span>
+                    <Bell className="text-blue-600 group-hover:text-blue-800" />
+                </button>
+
                 <button 
                   onClick={handleDisconnect}
                   className="w-full flex items-center justify-between p-4 bg-gray-50 border-4 border-gray-200 rounded-2xl hover:bg-gray-100 transition-colors group"

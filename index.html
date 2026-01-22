@@ -2,8 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#f0fdf4" />
     <title>LoveSync Doodle</title>
+    <link rel="manifest" href="/manifest.json" />
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,6 +19,7 @@
           linear-gradient(90deg, #86efac 1px, transparent 1px);
         background-size: 24px 24px;
         color: #1a1a1a;
+        overscroll-behavior-y: none; /* Prevent pull-to-refresh on mobile PWA */
       }
       /* Custom scrollbar for a cleaner look */
       ::-webkit-scrollbar {
@@ -75,6 +78,19 @@
     "lucide-react": "https://esm.sh/lucide-react@^0.562.0"
   }
 }
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/service-worker.js')
+        .then(registration => {
+          console.log('SW registered: ', registration);
+        })
+        .catch(registrationError => {
+          console.log('SW registration failed: ', registrationError);
+        });
+    });
+  }
 </script>
 </head>
   <body>
