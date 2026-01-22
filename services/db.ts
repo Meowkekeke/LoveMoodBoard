@@ -234,9 +234,34 @@ export const sendChatMessage = async (code: string, userId: string, userName: st
 
 export const endConversation = async (code: string) => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
-  await updateDoc(roomRef, {
-    conversationActive: false
-    // We keep the messages in the doc if we want, but UI won't show them.
-    // Ideally we might move them to a history, but for now just hiding the zone is enough.
-  });
+  const snap = await getDoc(roomRef);
+  
+  if (snap.exists()) {
+    const data = snap.data() as RoomData;
+    
+    // Only archive if there are messages
+    if (data.messages && data.messages.length > 0) {
+      const archiveEntry: MoodEntry = {
+        id: crypto.randomUUID(),
+        userId: 'system',
+        userName: 'LoveSync',
+        type: 'conversation',
+        note: data.conversationTopic || 'Conversation',
+        messages: data.messages,
+        timestamp: Date.now()
+      };
+      
+      await updateDoc(roomRef, {
+        conversationActive: false,
+        messages: [],
+        conversationTopic: '',
+        logs: arrayUnion(archiveEntry)
+      });
+    } else {
+      // Just close if empty
+      await updateDoc(roomRef, {
+        conversationActive: false
+      });
+    }
+  }
 };

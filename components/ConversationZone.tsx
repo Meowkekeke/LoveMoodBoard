@@ -33,89 +33,101 @@ export const ConversationZone: React.FC<ConversationZoneProps> = ({ roomCode, us
   };
 
   const handleEnd = async () => {
-    if (confirm("Are we feeling better? This will close the conversation zone.")) {
+    if (confirm("Are we feeling better? This will fold the conversation into your history.")) {
       await endConversation(roomCode);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#eff6ff] flex flex-col animate-in slide-in-from-bottom duration-500">
-      {/* Header */}
-      <div className="bg-white p-4 border-b-4 border-blue-200 shadow-sm flex justify-between items-center shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="bg-blue-100 p-2 rounded-full border-2 border-blue-300">
-             <MessageCircle className="text-blue-600" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold text-gray-800 leading-none">Conversation Zone</h2>
-            <p className="text-xs text-blue-500 font-bold uppercase tracking-widest mt-1">Safe Space</p>
-          </div>
-        </div>
-        
-        <button 
-          onClick={handleEnd}
-          className="bg-green-100 hover:bg-green-200 text-green-800 px-4 py-2 rounded-xl border-2 border-green-300 font-bold text-sm transition-colors flex items-center gap-2"
-        >
-          <HeartHandshake size={18} />
-          We're Good
-        </button>
-      </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+      {/* Dimmed Background */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm pointer-events-auto transition-opacity" />
 
-      {/* Topic Banner */}
-      <div className="bg-blue-500 text-white p-3 text-center shadow-inner shrink-0">
-        <p className="text-sm font-bold opacity-90 uppercase tracking-wider mb-1">We are talking about</p>
-        <p className="text-xl font-[Patrick_Hand] leading-tight">{topic}</p>
-      </div>
-
-      {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[url('https://www.transparenttextures.com/patterns/graphy.png')]">
-        {messages.length === 0 && (
-           <div className="text-center text-gray-400 mt-10">
-             <p className="italic">This is a safe space to discuss what's on your mind.</p>
-           </div>
-        )}
+      {/* Floating Bubble Container */}
+      <div className="bg-white w-full max-w-md h-[80vh] rounded-[3rem] border-8 border-blue-400 shadow-[0px_10px_0px_0px_rgba(59,130,246,0.3)] pointer-events-auto flex flex-col relative overflow-hidden animate-in zoom-in-95 duration-300">
         
-        {messages.map((msg) => {
-          const isMe = msg.senderId === userId;
-          return (
-            <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-              <div 
-                className={`
-                  max-w-[85%] px-4 py-3 rounded-2xl text-lg font-[Patrick_Hand] border-2 shadow-sm
-                  ${isMe 
-                    ? 'bg-blue-100 border-blue-300 rounded-br-none text-blue-900' 
-                    : 'bg-white border-gray-200 rounded-bl-none text-gray-800'
-                  }
-                `}
-              >
-                {msg.text}
+        {/* Cute Header */}
+        <div className="bg-blue-400 p-4 pt-6 pb-4 shrink-0 relative">
+           <div className="absolute top-0 left-0 w-full h-4 bg-blue-300 rounded-t-[2.5rem] opacity-50"></div>
+           <div className="flex justify-between items-center relative z-10">
+              <div className="flex items-center gap-2 text-white">
+                <div className="bg-white/20 p-2 rounded-full backdrop-blur-md">
+                   <MessageCircle size={24} className="fill-white" />
+                </div>
+                <div>
+                   <h2 className="font-bold text-xl leading-none">Safe Space</h2>
+                   <p className="text-xs opacity-90 font-bold">Talking about it</p>
+                </div>
               </div>
-              <span className="text-[10px] text-gray-400 font-bold mt-1 px-1">
-                {isMe ? 'You' : msg.senderName} • {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-              </span>
-            </div>
-          );
-        })}
-        <div ref={bottomRef} />
-      </div>
+              
+              <button 
+                onClick={handleEnd}
+                className="bg-white text-blue-500 px-3 py-1.5 rounded-full font-bold text-xs shadow-sm hover:bg-blue-50 transition-colors flex items-center gap-1 border-2 border-transparent hover:border-blue-200"
+              >
+                <HeartHandshake size={14} />
+                We're Good
+              </button>
+           </div>
+           
+           {/* Topic Pill */}
+           <div className="mt-4 bg-white/20 backdrop-blur-md rounded-xl p-3 text-center border-2 border-white/30">
+              <p className="text-white font-[Patrick_Hand] text-lg leading-tight drop-shadow-sm">
+                "{topic}"
+              </p>
+           </div>
+        </div>
 
-      {/* Input Area */}
-      <div className="p-4 bg-white border-t-4 border-blue-200 shrink-0">
-        <form onSubmit={handleSend} className="flex gap-2">
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="Type your thoughts..."
-            className="flex-1 p-3 border-2 border-gray-300 rounded-xl focus:outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100 transition-all font-[Patrick_Hand] text-xl"
-          />
-          <button 
-            type="submit"
-            className="bg-blue-500 hover:bg-blue-600 text-white p-3 rounded-xl border-2 border-blue-700 shadow-[2px_2px_0px_0px_rgba(0,0,0,0.2)] active:translate-y-0.5 active:shadow-none transition-all"
-          >
-            <Send size={24} />
-          </button>
-        </form>
+        {/* Messages Area */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#f0f9ff]">
+          {messages.length === 0 && (
+             <div className="flex flex-col items-center justify-center h-full text-center opacity-40">
+               <MessageCircle size={60} className="mb-2 text-blue-300" />
+               <p className="font-bold text-blue-300">Start the conversation...</p>
+             </div>
+          )}
+          
+          {messages.map((msg) => {
+            const isMe = msg.senderId === userId;
+            return (
+              <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
+                <div 
+                  className={`
+                    max-w-[85%] px-5 py-3 text-lg font-[Patrick_Hand] shadow-sm relative
+                    ${isMe 
+                      ? 'bg-blue-500 text-white rounded-2xl rounded-tr-sm' 
+                      : 'bg-white text-gray-700 border-2 border-gray-100 rounded-2xl rounded-tl-sm'
+                    }
+                  `}
+                >
+                  {msg.text}
+                </div>
+                <span className="text-[10px] text-gray-400 font-bold mt-1 px-1">
+                  {isMe ? 'You' : msg.senderName} • {new Date(msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                </span>
+              </div>
+            );
+          })}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* Input Area */}
+        <div className="p-4 bg-white border-t-2 border-blue-50 shrink-0">
+          <form onSubmit={handleSend} className="flex gap-2 items-center">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Type here..."
+              className="flex-1 p-4 bg-gray-50 border-2 border-gray-200 rounded-[2rem] focus:outline-none focus:border-blue-400 focus:bg-white transition-all font-[Patrick_Hand] text-xl"
+            />
+            <button 
+              type="submit"
+              className="w-14 h-14 bg-blue-500 hover:bg-blue-600 text-white rounded-full shadow-[0px_4px_0px_0px_rgba(0,0,0,0.1)] active:translate-y-0.5 active:shadow-none transition-all flex items-center justify-center border-4 border-blue-100"
+            >
+              <Send size={24} className="ml-1" />
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

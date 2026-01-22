@@ -36,23 +36,24 @@ export interface UserState {
   pendingInteraction?: Interaction | null; // The notification waiting for this user
 }
 
-export interface MoodEntry {
-  id: string;
-  userId: string;
-  userName: string;
-  type: 'mood' | 'action';
-  mood?: Mood; // Only for type 'mood'
-  category?: 'self_care' | 'rough' | 'needs'; // Only for type 'action'
-  icon?: string; // Icon identifier for actions
-  note: string;
-  timestamp: number;
-}
-
 export interface ChatMessage {
   id: string;
   senderId: string;
   senderName: string;
   text: string;
+  timestamp: number;
+}
+
+export interface MoodEntry {
+  id: string;
+  userId: string;
+  userName: string;
+  type: 'mood' | 'action' | 'conversation'; // Added 'conversation'
+  mood?: Mood; // Only for type 'mood'
+  category?: 'self_care' | 'rough' | 'needs'; // Only for type 'action'
+  icon?: string; // Icon identifier for actions
+  note: string; // For conversations, this is the topic
+  messages?: ChatMessage[]; // For archived conversations
   timestamp: number;
 }
 
