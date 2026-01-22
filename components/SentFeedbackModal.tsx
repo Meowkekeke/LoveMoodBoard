@@ -45,7 +45,7 @@ export const SentFeedbackModal: React.FC<SentFeedbackModalProps> = ({ type, part
 
   return (
     <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[#f0fdf4] w-full max-w-sm rounded-[2.5rem] border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-8 relative text-center animate-in zoom-in duration-300">
+      <div className="bg-[#fffbeb] w-full max-w-sm rounded-[2.5rem] border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-8 relative text-center animate-in zoom-in duration-300">
         
         {/* Decorative elements */}
         <div className="absolute top-0 right-1/2 translate-x-1/2 -translate-y-1/2 bg-[#fde047] px-4 py-1 border-2 border-black rounded-full font-bold text-sm tracking-widest shadow-sm">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles, MessageCircle, Bell, Ghost } from 'lucide-react';
+import { Sprout, Copy, LogOut, Settings, Trash2, Eraser, X, Bell, Plus, Users, User, Ghost, MessageCircle, Cloud, Sun, Flower, Leaf, Heart, Star } from 'lucide-react';
 import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom, startConversation, activateSpaceMode, endSpaceMode, checkAndEndSpaceMode } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
@@ -27,12 +27,10 @@ const getUserId = () => {
 // Utility for sending notifications
 const sendNotification = (title: string, body: string) => {
   if (Notification.permission === 'granted') {
-    // Only send if document is hidden (user is in another tab or app is backgrounded)
-    // OR if on mobile where "background" might just mean "not interacting"
     if (document.visibilityState === 'hidden') {
        new Notification(title, {
          body,
-         icon: '/icon-192.png', // Assuming icon exists
+         icon: '/icon-192.png',
          vibrate: [200, 100, 200]
        } as any);
     }
@@ -59,8 +57,6 @@ const App: React.FC = () => {
   
   // Modal State for Interactions
   const [sentInteractionData, setSentInteractionData] = useState<{ type: InteractionType; partnerName: string } | null>(null);
-  
-  // State for Rough Follow-up
   const [pendingRoughLog, setPendingRoughLog] = useState<{ icon: string; label: string } | null>(null);
   const [showSpaceDuration, setShowSpaceDuration] = useState(false);
 
@@ -81,7 +77,6 @@ const App: React.FC = () => {
 
     const unsubscribe = subscribeToRoom(roomCode, (data) => {
       if (!data) {
-        // Room was deleted
         localStorage.removeItem('lovesync_code');
         setRoomCode(null);
         setRoomData(null);
@@ -92,7 +87,6 @@ const App: React.FC = () => {
       setRoomData(data);
     });
 
-    // Clean up expired space modes locally/periodically
     const interval = setInterval(() => {
         if (roomData && roomCode) {
             checkAndEndSpaceMode(roomData, roomCode);
@@ -105,32 +99,26 @@ const App: React.FC = () => {
     }
   }, [roomCode, userId, roomData]); 
 
-  // Notification Logic Effect
+  // Notification Logic
   useEffect(() => {
     if (!roomData) return;
     
-    // Check if I am taking space - if so, NO notifications
     const isSpaceActive = roomData.spaceMode?.isActive && (roomData.spaceMode.endTime > Date.now());
     const amITakingSpace = isSpaceActive && roomData.spaceMode?.initiatorId === userId;
     
     if (amITakingSpace) {
-        // Reset refs so we don't get blasted when space ends
         prevLogsLength.current = roomData.logs.length;
         return;
     }
 
-    // 1. New Log Notification
     if (roomData.logs.length > prevLogsLength.current) {
         const newLog = roomData.logs[roomData.logs.length - 1];
-        // If it's not ME who posted, notify
         if (newLog.userId !== userId && newLog.userId !== 'SHARED') {
             sendNotification('New Note 🌱', `${newLog.userName}: ${newLog.note}`);
         }
     }
     prevLogsLength.current = roomData.logs.length;
 
-    // 2. New Interaction Notification
-    // Check pending interaction for ME
     const myData = roomData.hostId === userId ? roomData.hostState : roomData.guestState;
     if (myData.pendingInteraction) {
         if (myData.pendingInteraction.timestamp > prevInteractionTimestamp.current) {
@@ -138,122 +126,70 @@ const App: React.FC = () => {
             prevInteractionTimestamp.current = myData.pendingInteraction.timestamp;
         }
     }
-
   }, [roomData, userId]);
 
 
-  // Reset minimized state if conversation actually ends or new one starts
   useEffect(() => {
     if (roomData && !roomData.conversationActive) {
         setIsChatMinimized(false);
     }
   }, [roomData?.conversationActive]);
 
-  // Derived Data for Space Mode
+  // Derived Data
   const isSpaceActive = roomData?.spaceMode?.isActive && (roomData.spaceMode.endTime > Date.now());
   const amITakingSpace = isSpaceActive && roomData?.spaceMode?.initiatorId === userId;
   const isPartnerTakingSpace = isSpaceActive && !amITakingSpace;
 
-
-  // Actions
   const handleCreateRoom = async () => {
-    if (!userName.trim()) {
-      setShowNameModal(true);
-      return;
-    }
-    setIsLoading(true);
-    setError('');
+    if (!userName.trim()) { setShowNameModal(true); return; }
+    setIsLoading(true); setError('');
     try {
       const code = await createRoom(userId, userName);
       localStorage.setItem('lovesync_code', code);
       setRoomCode(code);
-    } catch (err) {
-      setError('Failed to create room. Try again.');
-      console.error(err);
-    } finally {
-      setIsLoading(false);
-    }
+    } catch (err) { setError('Failed to create room.'); } finally { setIsLoading(false); }
   };
 
   const handleJoinRoom = async () => {
     if (!inputCode.trim()) return;
-    if (!userName.trim()) {
-      setShowNameModal(true);
-      return;
-    }
-
-    setIsLoading(true);
-    setError('');
-    const code = inputCode.toUpperCase().trim();
-    
+    if (!userName.trim()) { setShowNameModal(true); return; }
+    setIsLoading(true); setError('');
     try {
-      const success = await joinRoom(code, userId, userName);
+      const success = await joinRoom(inputCode.toUpperCase().trim(), userId, userName);
       if (success) {
-        localStorage.setItem('lovesync_code', code);
-        setRoomCode(code);
-      } else {
-        setError('Room not found or full!');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to join.');
-    } finally {
-      setIsLoading(false);
-    }
+        localStorage.setItem('lovesync_code', inputCode.toUpperCase().trim());
+        setRoomCode(inputCode.toUpperCase().trim());
+      } else { setError('Room not found or full!'); }
+    } catch (err: any) { setError(err.message || 'Failed to join.'); } finally { setIsLoading(false); }
   };
 
   const handleAddLog = async (mood: Mood, note: string) => {
     if (!roomCode || !roomData) return;
-    
-    try {
-      await logMood(roomCode, userId, userName, mood, note);
-      setIsEditing(false);
-    } catch (err) {
-      console.error("Failed to add log", err);
-      alert("Couldn't add note, check internet!");
-    }
+    try { await logMood(roomCode, userId, userName, mood, note); setIsEditing(false); } 
+    catch (err) { alert("Couldn't add note."); }
   };
 
   const handleActionLog = async (category: 'self_care'|'rough'|'needs', icon: string, label: string) => {
     if (!roomCode) return;
-
-    // Intercept "Rough" category to show follow-up modal
-    if (category === 'rough') {
-      setIsMenuOpen(false);
-      setPendingRoughLog({ icon, label });
-      return;
-    }
-
+    if (category === 'rough') { setIsMenuOpen(false); setPendingRoughLog({ icon, label }); return; }
     try {
-      // Returns ID so we can patch it later if it becomes a conversation
       const logId = await logMood(roomCode, userId, userName, null, label, { category, icon });
-      
-      // If category is NEEDS, start conversation immediately
       if (category === 'needs') {
-        // TRIGGER TYPE: needs
         await startConversation(roomCode, `${userName} posted: ${label}`, 'needs', logId);
-        setIsChatMinimized(false); // Ensure chat opens
+        setIsChatMinimized(false);
       }
-    } catch (err) {
-      console.error("Failed to log action", err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleRoughCompletion = async (needId: string, needLabel: string) => {
     if (!roomCode || !pendingRoughLog) return;
-    
     try {
       const combinedNote = `${pendingRoughLog.label} • ${needLabel}`;
-      
       const logId = await logMood(roomCode, userId, userName, null, combinedNote, { category: 'rough', icon: pendingRoughLog.icon });
       setPendingRoughLog(null);
-
-      // Trigger Conversation
       await startConversation(roomCode, `${userName} is having a rough time: ${combinedNote}`, 'rough', logId);
       setIsChatMinimized(false);
-
-    } catch (err) {
-      console.error("Failed to log rough action", err);
-    }
+    } catch (err) { console.error(err); }
   };
 
   const handleStartSpaceMode = async (minutes: number, reason: string) => {
@@ -261,141 +197,81 @@ const App: React.FC = () => {
      try {
          await activateSpaceMode(roomCode, userId, userName, minutes, reason);
          setShowSpaceDuration(false);
-         // Clear any pending rough log if user switched flow, though unlikely via UI
          setPendingRoughLog(null);
-     } catch (err) {
-         console.error("Failed to start space mode", err);
-     }
+     } catch (err) { console.error(err); }
   };
 
   const handleEndSpaceEarly = async () => {
     if (!roomCode) return;
-    try {
-        await endSpaceMode(roomCode);
-    } catch (err) {
-        console.error("Failed to end space mode", err);
-    }
+    try { await endSpaceMode(roomCode); } catch (err) { console.error(err); }
   };
 
   const handleBatteryUpdate = async (level: number) => {
     if (!roomCode) return;
-    try {
-      await updateSocialBattery(roomCode, userId, level);
-    } catch (err) {
-      console.error("Failed battery update", err);
-    }
-  };
-
-  const handleInteraction = async (type: InteractionType) => {
-      if (!roomCode || !roomData) return;
-      
-      const isHost = roomData.hostId === userId;
-      const targetId = isHost ? roomData.guestId : roomData.hostId;
-      const targetName = isHost ? roomData.guestState.name : roomData.hostState.name;
-
-      if (!targetId) {
-          alert("Partner hasn't joined yet!");
-          return;
-      }
-
-      const messages: Record<InteractionType, string> = {
-          hug: 'sent a hug 🤗',
-          kiss: 'sent a kiss 💋',
-          poke: 'poked you 👉',
-          love: 'sent love ❤️'
-      };
-
-      try {
-          // Log to history
-          await logMood(roomCode, userId, userName, null, messages[type], { category: 'needs', icon: 'Heart' });
-          // Send persistent popup to partner
-          await sendInteraction(roomCode, userId, userName, type);
-          
-          // Show confirmation modal to sender
-          setSentInteractionData({
-            type,
-            partnerName: targetName || 'Partner'
-          });
-
-      } catch (err) {
-          console.error(err);
-      }
+    try { await updateSocialBattery(roomCode, userId, level); } catch (err) { console.error(err); }
   };
 
   const handleDismissInteraction = async () => {
       if (!roomCode) return;
-      await dismissInteraction(roomCode, userId);
+      try { await dismissInteraction(roomCode, userId); } catch (err) { console.error(err); }
+  };
+
+  const handleInteraction = async (type: InteractionType) => {
+      if (!roomCode || !roomData) return;
+      const isHost = roomData.hostId === userId;
+      const targetId = isHost ? roomData.guestId : roomData.hostId;
+      const targetName = isHost ? roomData.guestState.name : roomData.hostState.name;
+      if (!targetId) { alert("Partner hasn't joined yet!"); return; }
+
+      const messages: Record<InteractionType, string> = {
+          hug: 'sent a hug 🤗', kiss: 'sent a kiss 💋', poke: 'poked you 👉', love: 'sent love ❤️'
+      };
+
+      try {
+          await logMood(roomCode, userId, userName, null, messages[type], { category: 'needs', icon: 'Heart' });
+          await sendInteraction(roomCode, userId, userName, type);
+          setSentInteractionData({ type, partnerName: targetName || 'Partner' });
+      } catch (err) { console.error(err); }
   };
 
   const handleSendPartnerNote = async (note: string) => {
       if (!roomCode || !roomData) return;
       const isHost = roomData.hostId === userId;
       const targetId = isHost ? roomData.guestId : roomData.hostId;
-
-      if (!targetId) {
-          alert("Partner hasn't joined yet!");
-          return;
-      }
-
-      try {
-          // Log note to partner's ID
-          await logMood(roomCode, targetId, userName, null, note, { category: 'needs', icon: 'MessageCircle' });
-      } catch (err) {
-          console.error(err);
-          alert("Failed to send note.");
-      }
+      if (!targetId) { alert("Partner hasn't joined yet!"); return; }
+      try { await logMood(roomCode, targetId, userName, null, note, { category: 'needs', icon: 'MessageCircle' }); }
+      catch (err) { alert("Failed to send note."); }
   };
 
   const handleDisconnect = () => {
-    if(confirm("Just leaving for now? You can re-join with the code.")) {
-      localStorage.removeItem('lovesync_code');
-      setRoomCode(null);
-      setRoomData(null);
-      setShowSettings(false);
+    if(confirm("Just leaving for now?")) {
+      localStorage.removeItem('lovesync_code'); setRoomCode(null); setRoomData(null); setShowSettings(false);
     }
   };
 
   const handleClearMemory = async () => {
     if (!roomCode) return;
-    if (confirm("Are you sure? This will wipe the ENTIRE garden history for BOTH of you. (A fresh start!)")) {
-      try {
-        await clearRoomLogs(roomCode);
-        setShowSettings(false);
-      } catch (err) {
-        alert("Failed to clear memory.");
-      }
-    }
+    if (confirm("Wipe ALL history?")) { try { await clearRoomLogs(roomCode); setShowSettings(false); } catch (err) { alert("Failed."); } }
   };
 
   const handleDestroyGarden = async () => {
     if (!roomCode) return;
-    const confirmation = prompt("This will DELETE the entire room for both of you. Type 'DELETE' to confirm.");
-    if (confirmation === 'DELETE') {
-      try {
-        await deleteRoom(roomCode);
-        // Subscription will handle the cleanup via null data
-      } catch (err) {
-        alert("Failed to destroy garden.");
-      }
-    }
-  };
-
-  const saveName = () => {
-    if (userName.trim()) {
-      localStorage.setItem('lovesync_name', userName);
-      setShowNameModal(false);
-    }
+    if (prompt("Type 'DELETE' to destroy room.") === 'DELETE') { try { await deleteRoom(roomCode); } catch (err) { alert("Failed."); } }
   };
 
   const copyCode = () => {
-    if (roomCode) {
-      navigator.clipboard.writeText(roomCode);
-      alert('Code copied to clipboard! Share it with your partner.');
-    }
+    if (roomCode) { navigator.clipboard.writeText(roomCode); alert('Copied!'); }
   };
 
   const enableNotifications = () => {
       Notification.requestPermission();
+  };
+
+  const saveName = () => {
+    if (userName.trim()) {
+      localStorage.setItem('lovesync_name', userName.trim());
+      setShowNameModal(false);
+    }
   };
 
   // --- Render Logic ---
@@ -403,11 +279,20 @@ const App: React.FC = () => {
   // Decorative Background Elements
   const BackgroundDoodles = () => (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-      <Cloud className="absolute top-10 left-[-20px] text-white/60 w-32 h-32 animate-pulse" style={{ animationDuration: '4s' }} />
-      <Cloud className="absolute top-40 right-[-40px] text-white/60 w-40 h-40 animate-pulse" style={{ animationDuration: '6s' }} />
-      <Sun className="absolute top-8 right-8 text-[#fde047]/40 w-24 h-24 animate-spin-slow" style={{ animationDuration: '10s' }} />
-      <Flower className="absolute bottom-10 left-10 text-[#fca5a5]/40 w-16 h-16 animate-bounce" style={{ animationDuration: '3s' }} />
-      <Leaf className="absolute bottom-20 right-20 text-[#86efac]/40 w-20 h-20 rotate-45" />
+      <Cloud className="absolute top-10 left-[-20px] text-green-200/40 w-32 h-32 animate-wiggle" style={{ animationDuration: '8s' }} strokeWidth={1.5} />
+      <Cloud className="absolute top-40 right-[-40px] text-green-200/40 w-40 h-40 animate-wiggle" style={{ animationDuration: '10s', animationDelay: '1s' }} strokeWidth={1.5} />
+      <Sun className="absolute top-8 right-8 text-yellow-300/40 w-24 h-24 animate-spin-slow" style={{ animationDuration: '20s' }} strokeWidth={1.5} />
+      
+      {/* Scattered Organic Elements */}
+      <Flower className="absolute bottom-1/4 left-10 text-pink-200/50 w-12 h-12 animate-bounce-in" strokeWidth={1.5} />
+      <Leaf className="absolute bottom-20 right-20 text-green-300/50 w-16 h-16 rotate-45" strokeWidth={1.5} />
+      <Heart className="absolute top-1/3 left-1/4 text-red-200/30 w-8 h-8 -rotate-12" strokeWidth={1.5} />
+      <Star className="absolute bottom-1/3 right-10 text-yellow-200/50 w-10 h-10 rotate-12" strokeWidth={1.5} />
+      
+      {/* Little dots */}
+      <div className="absolute top-20 left-20 w-2 h-2 bg-green-300/30 rounded-full"></div>
+      <div className="absolute top-60 right-1/3 w-3 h-3 bg-yellow-300/30 rounded-full"></div>
+      <div className="absolute bottom-10 left-1/2 w-2 h-2 bg-pink-300/30 rounded-full"></div>
     </div>
   );
 
@@ -487,36 +372,30 @@ const App: React.FC = () => {
   // 3. Dashboard (In Room)
   if (!roomData) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#f0fdf4]">
-        <Leaf size={80} className="text-[#86efac] fill-current stroke-black stroke-[3] animate-bounce mb-4" />
-        <p className="text-2xl font-bold text-gray-800 tracking-widest uppercase animate-pulse">Loading...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <BackgroundDoodles />
+        <div className="relative z-10 flex flex-col items-center">
+             <Leaf size={80} className="text-[#86efac] fill-current stroke-black stroke-[3] animate-bounce mb-4" />
+             <p className="text-2xl font-bold text-gray-800 tracking-widest uppercase animate-pulse">Loading...</p>
+        </div>
       </div>
     );
   }
 
-  // Derived Data
   const isHost = roomData.hostId === userId;
   const myState = isHost ? roomData.hostState : roomData.guestState;
   const partnerState = isHost ? roomData.guestState : roomData.hostState;
+  const partnerName = (isHost && !roomData.guestId) ? 'Partner' : partnerState.name;
   
-  // Use Partner Name if joined, otherwise default to "Partner"
-  const partnerTabLabel = (isHost && !roomData.guestId) ? 'Partner' : partnerState.name;
-  const isPartnerJoined = !!roomData.guestId;
-
   const logs = roomData.logs || []; 
   const sortedLogs = [...logs].sort((a, b) => b.timestamp - a.timestamp);
-  
-  // Filter Logs
-  // Include my logs OR shared conversations
   const myLogs = sortedLogs.filter(l => l.userId === userId || l.userId === 'SHARED');
-  // Include partner logs OR shared conversations
   const partnerLogs = sortedLogs.filter(l => (l.userId !== userId && l.userId !== 'SHARED') || l.userId === 'SHARED');
 
   return (
-    <div className="h-[100dvh] p-4 flex flex-col max-w-md md:max-w-2xl mx-auto relative overflow-hidden">
+    <div className="h-[100dvh] p-0 md:p-4 flex flex-col max-w-md md:max-w-2xl mx-auto relative overflow-hidden">
       <BackgroundDoodles />
       
-      {/* GLOBAL SPACE MODE BLOCKER */}
       {isSpaceActive ? (
           <div className="relative z-50 h-full">
             <SpaceCountdown 
@@ -530,318 +409,151 @@ const App: React.FC = () => {
       ) : (
       <>
         {/* Header */}
-        <header className="relative z-20 flex justify-between items-center mb-4 bg-white p-3 rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] shrink-0">
-            <div className="flex items-center gap-2">
-            <div className="bg-[#86efac] p-2 rounded-lg border-2 border-black">
-                <Sprout className="text-black w-5 h-5" />
+        <header className="relative z-20 bg-white/90 backdrop-blur-sm pt-10 pb-2 px-4 shadow-sm border-b-2 border-green-100 shrink-0 rounded-b-2xl">
+            <div className="flex justify-between items-center mb-4">
+                <div className="flex items-center gap-2">
+                    <div className="bg-green-100 p-1.5 rounded-lg border-2 border-green-200">
+                        <Sprout className="text-green-600 w-5 h-5" />
+                    </div>
+                    <div>
+                        <h1 className="font-bold text-lg leading-none text-gray-800">LoveSync</h1>
+                        <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">{!roomData.guestId ? 'Waiting for partner' : 'Connected'}</p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-1">
+                    {!roomData.guestId && <button onClick={copyCode} className="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-lg flex items-center gap-1 border border-yellow-200"><Copy size={12} /> {roomCode}</button>}
+                    <button onClick={() => setShowSettings(true)} className="p-2 text-gray-400 hover:text-gray-600"><Settings size={20} /></button>
+                </div>
             </div>
-            <h1 className="font-bold text-xl tracking-tight hidden sm:block">LoveSync</h1>
-            </div>
-            
-            <div className="flex items-center gap-2">
-            {/* Only show code if partner hasn't joined */}
-            {!isPartnerJoined && (
-                <button 
-                    onClick={copyCode}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-[#fde047] hover:bg-[#facc15] border-2 border-black rounded-lg text-xs font-bold transition-all active:scale-95 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                >
-                    <span className="font-mono">{roomCode}</span>
-                    <Copy size={12} />
-                </button>
-            )}
 
-            <button onClick={() => setShowSettings(true)} className="p-2 bg-white hover:bg-gray-100 border-2 border-black rounded-lg text-black transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
-                <Settings size={18} />
-            </button>
-            </div>
+            {/* Batteries Row */}
+            {roomData.guestId && (
+                <div className="flex gap-2">
+                     <div className={`flex-1 p-2 rounded-xl border-2 transition-all ${activeTab === 'me' ? 'bg-white border-green-400 shadow-sm' : 'bg-gray-50 border-transparent opacity-60'}`}>
+                         <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Me</p>
+                         <SocialBattery level={myState.socialBattery || 80} onUpdate={handleBatteryUpdate} />
+                     </div>
+                     <div className={`flex-1 p-2 rounded-xl border-2 transition-all ${activeTab === 'partner' ? 'bg-white border-green-400 shadow-sm' : 'bg-gray-50 border-transparent opacity-60'}`}>
+                         <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">{partnerName}</p>
+                         <SocialBattery level={partnerState.socialBattery || 80} readOnly={true} />
+                     </div>
+                </div>
+            )}
         </header>
 
-        {/* Tabs */}
-        <nav className="relative z-20 flex gap-2 mb-4 shrink-0">
+        {/* Tab Switcher */}
+        <nav className="relative z-20 flex px-4 pt-4 shrink-0">
             <button 
-            onClick={() => setActiveTab('me')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all min-w-0 ${
-                activeTab === 'me' 
-                ? 'bg-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]' 
-                : 'bg-black/5 border-transparent text-gray-500 hover:bg-black/10'
-            }`}
+                onClick={() => setActiveTab('me')}
+                className={`flex-1 pb-3 text-center font-bold text-lg transition-colors border-b-4 ${activeTab === 'me' ? 'border-black text-black' : 'border-transparent text-gray-400/70'}`}
             >
-            <User size={20} className="shrink-0" />
-            Me
+                My Journal
             </button>
             <button 
-            onClick={() => setActiveTab('partner')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all min-w-0 ${
-                activeTab === 'partner' 
-                ? 'bg-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]' 
-                : 'bg-black/5 border-transparent text-gray-500 hover:bg-black/10'
-            }`}
+                onClick={() => setActiveTab('partner')}
+                className={`flex-1 pb-3 text-center font-bold text-lg transition-colors border-b-4 ${activeTab === 'partner' ? 'border-black text-black' : 'border-transparent text-gray-400/70'}`}
             >
-            <Users size={20} className="shrink-0" />
-            <span className="truncate">{partnerTabLabel}</span>
+                {partnerName}
             </button>
         </nav>
 
-        {/* Main Content */}
+        {/* Main Content Feed */}
         <main className="flex-1 flex flex-col relative z-10 min-h-0">
-            
-            {/* Me Tab */}
-            {activeTab === 'me' && (
-            <section className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-300">
-                
-                {/* 1. Status Section */}
-                <div className="mb-4 shrink-0">
-                <SocialBattery 
-                    level={myState.socialBattery || 80} 
-                    onUpdate={handleBatteryUpdate} 
-                />
-                </div>
-
-                {/* 2. Logs Feed (Scrollable) */}
-                <div className="flex-1 overflow-y-auto px-4 space-y-6 pb-24">
+            {activeTab === 'me' ? (
+                <div className="flex-1 overflow-y-auto px-4 py-6 pb-24 space-y-6">
                     {myLogs.length === 0 ? (
-                    <div className="text-center py-10 opacity-60">
-                        <p className="font-bold text-xl">No notes yet!</p>
-                    </div>
+                         <div className="text-center mt-10 p-8 bg-white/60 backdrop-blur-sm rounded-3xl border-2 border-dashed border-gray-300">
+                             <h3 className="text-xl font-bold text-gray-500 mb-2 font-[Patrick_Hand]">Your journal is empty</h3>
+                             <p className="text-gray-400 text-sm font-bold">Tap the + button to log how you feel.</p>
+                         </div>
                     ) : (
                         myLogs.map(log => (
-                            <MoodCard 
-                                key={log.id} 
-                                data={{
-                                    name: log.userName,
-                                    type: log.type,
-                                    mood: log.mood,
-                                    category: log.category,
-                                    icon: log.icon,
-                                    note: log.note,
-                                    timestamp: log.timestamp,
-                                    messages: log.messages
-                                }}
-                                isMe={log.userId === userId} // Shared logs will be false, so no "YOU" badge if logic was strict, but we handle below
-                                isShared={log.userId === 'SHARED'}
-                            />
+                            <MoodCard key={log.id} data={log} isMe={log.userId === userId} isShared={log.userId === 'SHARED'} />
                         ))
                     )}
                 </div>
-            </section>
-            )}
-
-            {/* Partner Tab */}
-            {activeTab === 'partner' && (
-            <section className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
-                {roomData.guestId ? (
-                    <>
-                        <div className="mb-4 shrink-0">
-                            <SocialBattery 
-                                level={partnerState.socialBattery || 80} 
-                                readOnly={true}
-                            />
+            ) : (
+                <div className="flex-1 overflow-y-auto px-4 py-6 pb-24 space-y-6">
+                    {!roomData.guestId ? (
+                        <div className="mt-10 p-6 bg-yellow-50/90 rounded-2xl border-2 border-yellow-200 text-center shadow-sm">
+                            <p className="font-bold text-yellow-800">Share code <span className="font-mono bg-white px-1 rounded">{roomCode}</span> to connect.</p>
                         </div>
-                        
-                        <div className="flex-1 overflow-y-auto px-4 space-y-6 pb-24">
-                            {partnerLogs.length === 0 ? (
-                                <div className="text-center py-10 opacity-60">
-                                    <p className="font-bold text-xl">{partnerTabLabel} hasn't posted yet.</p>
-                                </div>
-                            ) : (
-                                partnerLogs.map(log => (
-                                    <MoodCard 
-                                        key={log.id} 
-                                        data={{
-                                            name: log.userName,
-                                            type: log.type,
-                                            mood: log.mood,
-                                            category: log.category,
-                                            icon: log.icon,
-                                            note: log.note,
-                                            timestamp: log.timestamp,
-                                            messages: log.messages
-                                        }}
-                                        isMe={false}
-                                        isShared={log.userId === 'SHARED'}
-                                    />
-                                ))
-                            )}
+                    ) : partnerLogs.length === 0 ? (
+                        <div className="text-center mt-10 p-8 bg-white/60 backdrop-blur-sm rounded-3xl border-2 border-dashed border-gray-300">
+                             <h3 className="text-xl font-bold text-gray-500 mb-2 font-[Patrick_Hand]">No updates yet</h3>
+                             <p className="text-gray-400 text-sm font-bold">{partnerName} hasn't posted anything.</p>
                         </div>
-                    </>
-                ) : (
-                    <div className="bg-white p-8 rounded-3xl border-4 border-black border-dashed text-center">
-                        <div className="animate-spin text-4xl mb-4">⏳</div>
-                        <p className="font-bold text-gray-500 text-xl">Waiting for partner...</p>
-                        <p className="mt-2">Share code: <span className="font-mono bg-[#fde047] px-2 py-1 rounded border-2 border-black">{roomCode}</span></p>
-                    </div>
-                )}
-            </section>
+                    ) : (
+                        partnerLogs.map(log => (
+                            <MoodCard key={log.id} data={log} isMe={false} isShared={log.userId === 'SHARED'} />
+                        ))
+                    )}
+                </div>
             )}
-
         </main>
       </>
       )}
 
-      {/* Persistent Interaction Pop-up (Only shows when on ME tab) - RECEIVER */}
-      {/* BLOCK INTERACTION if I am taking space */}
+      {/* Interaction Modals & Overlays */}
       {activeTab === 'me' && myState.pendingInteraction && !amITakingSpace && !isSpaceActive && (
-          <InteractionModal 
-            interaction={myState.pendingInteraction} 
-            onDismiss={handleDismissInteraction}
-          />
+          <InteractionModal interaction={myState.pendingInteraction} onDismiss={handleDismissInteraction} />
       )}
-
-      {/* Sent Confirmation Pop-up - SENDER */}
-      {sentInteractionData && (
-        <SentFeedbackModal 
-          type={sentInteractionData.type}
-          partnerName={sentInteractionData.partnerName}
-          onClose={() => setSentInteractionData(null)}
-        />
-      )}
-
-      {/* Rough Follow-up Modal */}
-      {pendingRoughLog && (
-        <RoughFollowUpModal 
-          onSelect={handleRoughCompletion}
-          onCancel={() => setPendingRoughLog(null)}
-        />
-      )}
-
-      {/* Space Duration Modal */}
-      {showSpaceDuration && (
-        <SpaceDurationModal 
-            onSelectDuration={handleStartSpaceMode}
-            onCancel={() => setShowSpaceDuration(false)}
-        />
-      )}
+      {sentInteractionData && <SentFeedbackModal type={sentInteractionData.type} partnerName={sentInteractionData.partnerName} onClose={() => setSentInteractionData(null)} />}
+      {pendingRoughLog && <RoughFollowUpModal onSelect={handleRoughCompletion} onCancel={() => setPendingRoughLog(null)} />}
+      {showSpaceDuration && <SpaceDurationModal onSelectDuration={handleStartSpaceMode} onCancel={() => setShowSpaceDuration(false)} />}
       
-      {/* CONVERSATION ZONE OVERLAY */}
       {roomData.conversationActive && !isChatMinimized && !amITakingSpace && !isSpaceActive && (
-        <ConversationZone 
-          roomCode={roomCode}
-          userId={userId}
-          userName={userName}
-          topic={roomData.conversationTopic || 'General Chat'}
-          messages={roomData.messages || []}
-          onMinimize={() => setIsChatMinimized(true)}
-        />
+        <ConversationZone roomCode={roomCode} userId={userId} userName={userName} topic={roomData.conversationTopic || 'Chat'} messages={roomData.messages || []} onMinimize={() => setIsChatMinimized(true)} />
       )}
       
-      {/* Minimized Chat Bubble */}
       {roomData.conversationActive && isChatMinimized && !amITakingSpace && !isSpaceActive && (
          <div className="fixed bottom-6 left-6 z-40">
-            <button 
-              onClick={() => setIsChatMinimized(false)}
-              className="w-16 h-16 bg-blue-500 border-4 border-white rounded-full shadow-[0px_4px_12px_rgba(59,130,246,0.5)] flex items-center justify-center animate-bounce hover:scale-105 transition-transform"
-            >
-              <MessageCircle size={32} className="text-white fill-white" />
-              <span className="absolute -top-1 -right-1 flex h-4 w-4">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
-              </span>
+            <button onClick={() => setIsChatMinimized(false)} className="w-14 h-14 bg-blue-500 border-4 border-white rounded-full shadow-lg flex items-center justify-center animate-bounce text-white">
+              <MessageCircle size={28} />
             </button>
          </div>
       )}
 
-      {/* Floating Action Buttons */}
+      {/* Unified FAB */}
       {(roomData.guestId && (!roomData.conversationActive || isChatMinimized) && !isSpaceActive) && (
-          <div className="fixed bottom-6 right-6 z-40 flex items-end gap-3">
-             {/* Space Button - Pill Shape */}
-             <button
-                onClick={() => setShowSpaceDuration(true)}
-                className="h-12 px-4 bg-white border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2 hover:bg-gray-50 active:translate-y-1 active:shadow-none transition-all group mr-1"
-                title="I need space"
-            >
-                <Ghost size={20} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
-                <span className="font-bold text-gray-600 group-hover:text-black">Need Space</span>
-            </button>
-
-            {/* Main Add Button */}
+          <div className="fixed bottom-6 right-6 z-40">
             <button 
                 onClick={() => setIsMenuOpen(true)}
-                className="w-16 h-16 bg-[#fde047] border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:bg-[#facc15] active:translate-y-1 active:shadow-none transition-all animate-bounce-in"
+                className="w-16 h-16 bg-[#1a1a1a] text-white rounded-[2rem] shadow-[4px_4px_0px_0px_rgba(0,0,0,0.3)] flex items-center justify-center hover:scale-105 active:scale-95 transition-all border-2 border-white/20"
             >
                 <Plus size={32} strokeWidth={3} />
             </button>
           </div>
       )}
 
-      {/* Main Menu Modal */}
+      {/* Menu Modal */}
       {isMenuOpen && (
         <MenuModal 
           type={activeTab}
-          partnerName={partnerTabLabel}
+          partnerName={partnerName}
           onClose={() => setIsMenuOpen(false)}
           onOpenMoodEditor={() => { setIsMenuOpen(false); setIsEditing(true); }}
           onLogAction={handleActionLog}
+          onStartSpaceMode={() => setShowSpaceDuration(true)}
           onInteract={handleInteraction}
           onSendPartnerNote={handleSendPartnerNote}
         />
       )}
 
-      {/* Editor Modal */}
-      {isEditing && (
-        <MoodEditor 
-          currentMood={Mood.HAPPY} 
-          currentNote=""
-          onSave={handleAddLog}
-          onCancel={() => setIsEditing(false)}
-        />
-      )}
+      {isEditing && <MoodEditor currentMood={Mood.HAPPY} currentNote="" onSave={handleAddLog} onCancel={() => setIsEditing(false)} />}
 
-      {/* Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-           <div className="bg-white w-full max-w-sm rounded-[2.5rem] border-4 border-black shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] p-6 relative">
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+           <div className="bg-white w-full max-w-sm rounded-3xl p-6 relative shadow-2xl border-4 border-black">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold">Garden Settings</h2>
-                <button 
-                  onClick={() => setShowSettings(false)}
-                  className="p-2 bg-gray-100 border-2 border-black rounded-full hover:bg-gray-200 transition-colors"
-                >
-                  <X size={20} />
-                </button>
+                <h2 className="text-2xl font-bold font-[Patrick_Hand]">Settings</h2>
+                <button onClick={() => setShowSettings(false)} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200"><X size={20} /></button>
               </div>
-
               <div className="space-y-3">
-                <button 
-                    onClick={enableNotifications}
-                    className="w-full flex items-center justify-between p-4 bg-blue-50 border-4 border-blue-200 rounded-2xl hover:bg-blue-100 transition-colors group"
-                >
-                    <span className="font-bold text-blue-800">Enable Notifications</span>
-                    <Bell className="text-blue-600 group-hover:text-blue-800" />
-                </button>
-
-                <button 
-                  onClick={handleDisconnect}
-                  className="w-full flex items-center justify-between p-4 bg-gray-50 border-4 border-gray-200 rounded-2xl hover:bg-gray-100 transition-colors group"
-                >
-                  <span className="font-bold text-gray-600">Disconnect Device</span>
-                  <LogOut className="text-gray-400 group-hover:text-black" />
-                </button>
-
-                <button 
-                  onClick={handleClearMemory}
-                  className="w-full flex items-center justify-between p-4 bg-yellow-50 border-4 border-yellow-200 rounded-2xl hover:bg-yellow-100 transition-colors group"
-                >
-                   <div className="text-left">
-                     <span className="font-bold text-yellow-800 block">Clear Memories</span>
-                     <span className="text-xs font-bold text-yellow-600">Reset logs for BOTH</span>
-                   </div>
-                   <Eraser className="text-yellow-600 group-hover:text-yellow-800" />
-                </button>
-
-                <button 
-                  onClick={handleDestroyGarden}
-                  className="w-full flex items-center justify-between p-4 bg-red-50 border-4 border-red-200 rounded-2xl hover:bg-red-100 transition-colors group"
-                >
-                   <div className="text-left">
-                     <span className="font-bold text-red-800 block">Destroy Garden</span>
-                     <span className="text-xs font-bold text-red-600">Delete everything & Exit</span>
-                   </div>
-                   <Trash2 className="text-red-600 group-hover:text-red-800" />
-                </button>
-              </div>
-
-              <div className="mt-6 text-center">
-                 <p className="text-xs text-gray-400 font-bold">LoveSync v1.0</p>
+                <button onClick={() => Notification.requestPermission()} className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 font-bold text-gray-700 transition-colors">Notifications <Bell size={18} /></button>
+                <button onClick={handleDisconnect} className="w-full flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 font-bold text-gray-700 transition-colors">Logout <LogOut size={18} /></button>
+                <button onClick={handleClearMemory} className="w-full flex items-center justify-between p-4 bg-yellow-50 rounded-xl hover:bg-yellow-100 font-bold text-yellow-800 transition-colors">Clear History <Eraser size={18} /></button>
+                <button onClick={handleDestroyGarden} className="w-full flex items-center justify-between p-4 bg-red-50 rounded-xl hover:bg-red-100 font-bold text-red-800 transition-colors">Delete Room <Trash2 size={18} /></button>
               </div>
            </div>
         </div>
