@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles, MessageCircle, Bell } from 'lucide-react';
+import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles, MessageCircle, Bell, Ghost } from 'lucide-react';
 import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom, startConversation, activateSpaceMode, checkAndEndSpaceMode } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
@@ -241,13 +241,6 @@ const App: React.FC = () => {
   const handleRoughCompletion = async (needId: string, needLabel: string) => {
     if (!roomCode || !pendingRoughLog) return;
     
-    // SPECIAL CASE: SPACE MODE
-    if (needId === 'space') {
-        setShowSpaceDuration(true);
-        // We keep pendingRoughLog to use its icon, but we don't clear it yet
-        return;
-    }
-
     try {
       const combinedNote = `${pendingRoughLog.label} • ${needLabel}`;
       
@@ -264,11 +257,12 @@ const App: React.FC = () => {
   };
 
   const handleStartSpaceMode = async (minutes: number) => {
-     if (!roomCode || !pendingRoughLog) return;
+     if (!roomCode) return;
      try {
          await activateSpaceMode(roomCode, userId, userName, minutes);
-         setPendingRoughLog(null);
          setShowSpaceDuration(false);
+         // Clear any pending rough log if user switched flow, though unlikely via UI
+         setPendingRoughLog(null);
      } catch (err) {
          console.error("Failed to start space mode", err);
      }
@@ -739,9 +733,19 @@ const App: React.FC = () => {
          </div>
       )}
 
-      {/* Floating Action Button */}
+      {/* Floating Action Buttons */}
       {(roomData.guestId && (!roomData.conversationActive || isChatMinimized)) && (
-          <div className="fixed bottom-6 right-6 z-40">
+          <div className="fixed bottom-6 right-6 z-40 flex items-end gap-3">
+             {/* Space Button */}
+             <button
+                onClick={() => setShowSpaceDuration(true)}
+                className="w-12 h-12 bg-gray-100 border-4 border-black rounded-full shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:bg-gray-200 active:translate-y-1 active:shadow-none transition-all"
+                title="I need space"
+            >
+                <Ghost size={20} className="text-gray-500" />
+            </button>
+
+            {/* Main Add Button */}
             <button 
                 onClick={() => setIsMenuOpen(true)}
                 className="w-16 h-16 bg-[#fde047] border-4 border-black rounded-full shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] flex items-center justify-center hover:bg-[#facc15] active:translate-y-1 active:shadow-none transition-all animate-bounce-in"

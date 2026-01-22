@@ -172,7 +172,6 @@ export const ACTION_CATEGORIES = {
       { id: 'sleep_early', label: 'Sleep Early', icon: 'MoonStar', color: 'text-indigo-500' },
       { id: 'help', label: 'House Help', icon: 'Home', color: 'text-orange-600' },
       { id: 'listen', label: 'Listen', icon: 'Ear', color: 'text-amber-600' },
-      { id: 'space', label: 'Space', icon: 'Ghost', color: 'text-gray-400' },
     ]
   }
 };

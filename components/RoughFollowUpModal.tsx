@@ -9,7 +9,6 @@ interface RoughFollowUpModalProps {
 
 export const RoughFollowUpModal: React.FC<RoughFollowUpModalProps> = ({ onSelect, onCancel }) => {
   const options = [
-    { id: 'space', label: 'I need some space', icon: <Ghost size={32} className="text-gray-500" />, color: 'bg-gray-100 hover:bg-gray-200' },
     { id: 'comfort', label: 'I need comfort', icon: <Heart size={32} className="text-pink-500 fill-pink-200" />, color: 'bg-pink-100 hover:bg-pink-200' },
     { id: 'talk', label: 'I need to talk', icon: <MessageCircle size={32} className="text-blue-500" />, color: 'bg-blue-100 hover:bg-blue-200' },
     { id: 'solution', label: 'I need a solution', icon: <Lightbulb size={32} className="text-yellow-600 fill-yellow-200" />, color: 'bg-yellow-100 hover:bg-yellow-200' },
