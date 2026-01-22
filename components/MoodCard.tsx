@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { MOOD_COLORS, Mood, ChatMessage } from '../types';
-import { Clock, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { Clock, ChevronDown, ChevronUp, HeartHandshake } from 'lucide-react';
 import { MoodIcon } from './MoodIcon';
 import { 
   Flower2, Footprints, Activity, Dumbbell, BookOpen, Palette, Droplet, 
@@ -51,11 +51,8 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe, isShared = false
     IconComponent = <LucideIcon size={40} className="text-black/80" strokeWidth={2.5} />;
   } else if (data.type === 'conversation') {
     bgColor = 'bg-blue-200';
-    IconComponent = (
-      <div className="bg-white rounded-full p-2 border-4 border-blue-300">
-         <Check size={28} className="text-green-600" strokeWidth={4} />
-      </div>
-    );
+    // Use the HeartHandshake directly, without extra borders/bg, to match standard log shape
+    IconComponent = <HeartHandshake size={48} className="text-black/80" strokeWidth={2.5} />;
   }
 
   // Format time to exact date & time

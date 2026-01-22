@@ -1,22 +1,40 @@
 
 export enum Mood {
-  // Positive
+  // Positive (10)
   HAPPY = 'happy',
   EXCITED = 'excited',
   ROMANTIC = 'romantic',
   CHILL = 'chill',
   GRATEFUL = 'grateful',
+  PLAYFUL = 'playful',
+  PROUD = 'proud',
+  SAFE = 'safe',
+  HOPEFUL = 'hopeful',
+  ENERGETIC = 'energetic',
   
-  // Neutral/Body
+  // Neutral/Body (10)
   HUNGRY = 'hungry',
   TIRED = 'tired',
   CONFUSED = 'confused',
+  BORED = 'bored',
+  BUSY = 'busy',
+  FOCUSED = 'focused',
+  NUMB = 'numb',
+  MEH = 'meh',
+  COZY = 'cozy',
+  WOBBLY = 'wobbly',
 
-  // Negative
+  // Negative (10)
   SAD = 'sad',
   ANGRY = 'angry',
   SICK = 'sick',
-  STRESSED = 'stressed'
+  STRESSED = 'stressed',
+  ANXIOUS = 'anxious',
+  LONELY = 'lonely',
+  HURT = 'hurt',
+  JEALOUS = 'jealous',
+  OVERWHELMED = 'overwhelmed',
+  GUILTY = 'guilty'
 }
 
 export type InteractionType = 'hug' | 'kiss' | 'love' | 'poke';
@@ -24,7 +42,7 @@ export type InteractionType = 'hug' | 'kiss' | 'love' | 'poke';
 export interface Interaction {
   type: InteractionType;
   senderId: string;
-  senderName: string; // Added name so we can display it easily
+  senderName: string;
   timestamp: number;
 }
 
@@ -34,7 +52,7 @@ export interface UserState {
   note: string;
   socialBattery: number; // 0-100
   lastUpdated: number; // Timestamp
-  pendingInteraction?: Interaction | null; // The notification waiting for this user
+  pendingInteraction?: Interaction | null; 
 }
 
 export interface ChatMessage {
@@ -49,12 +67,12 @@ export interface MoodEntry {
   id: string;
   userId: string;
   userName: string;
-  type: 'mood' | 'action' | 'conversation'; // Added 'conversation'
-  mood?: Mood; // Only for type 'mood'
-  category?: 'rough' | 'needs'; // Removed self_care
-  icon?: string; // Icon identifier for actions
-  note: string; // For conversations, this is the topic
-  messages?: ChatMessage[]; // For archived conversations
+  type: 'mood' | 'action' | 'conversation';
+  mood?: Mood; 
+  category?: 'rough' | 'needs';
+  icon?: string; 
+  note: string;
+  messages?: ChatMessage[];
   timestamp: number;
 }
 
@@ -63,26 +81,24 @@ export interface SpaceModeState {
   initiatorId: string;
   initiatorName: string;
   endTime: number;
-  reason?: string; // Added reason for taking space
+  reason?: string;
 }
 
 export interface RoomData {
   hostId: string;
-  guestId?: string; // Optional until guest joins
+  guestId?: string;
   hostState: UserState;
   guestState: UserState;
   createdAt: number;
-  lastInteraction?: Interaction; // Kept for legacy or global effects if needed
+  lastInteraction?: Interaction;
   logs: MoodEntry[];
   
-  // Conversation Zone State
   conversationActive?: boolean;
   conversationTopic?: string;
-  conversationTrigger?: 'rough' | 'needs'; // Track source
-  conversationSourceLogId?: string | null; // Track which log started this
+  conversationTrigger?: 'rough' | 'needs';
+  conversationSourceLogId?: string | null;
   messages?: ChatMessage[];
 
-  // Space Mode State
   spaceMode?: SpaceModeState;
 }
 
@@ -90,21 +106,30 @@ export type MoodCategory = 'positive' | 'neutral' | 'negative';
 
 export const MOOD_CATEGORIES: Record<MoodCategory, { label: string, emoji: string, moods: Mood[], baseColor: string }> = {
   positive: { 
-    label: 'Happy', 
+    label: 'Good', 
     emoji: '😊',
-    moods: [Mood.HAPPY, Mood.EXCITED, Mood.ROMANTIC, Mood.CHILL, Mood.GRATEFUL],
+    moods: [
+      Mood.HAPPY, Mood.EXCITED, Mood.ROMANTIC, Mood.CHILL, Mood.GRATEFUL,
+      Mood.PLAYFUL, Mood.PROUD, Mood.SAFE, Mood.HOPEFUL, Mood.ENERGETIC
+    ],
     baseColor: 'bg-[#fef9c3]' // Yellow-100
   },
   neutral: { 
-    label: 'Ok-ish', 
+    label: 'Meh', 
     emoji: '😐',
-    moods: [Mood.HUNGRY, Mood.TIRED, Mood.CONFUSED],
+    moods: [
+      Mood.HUNGRY, Mood.TIRED, Mood.CONFUSED, Mood.BORED, Mood.BUSY,
+      Mood.FOCUSED, Mood.NUMB, Mood.MEH, Mood.COZY, Mood.WOBBLY
+    ],
     baseColor: 'bg-[#f3f4f6]' // Gray-100
   },
   negative: { 
-    label: 'Not Good', 
+    label: 'Bad', 
     emoji: '😫',
-    moods: [Mood.SAD, Mood.ANGRY, Mood.SICK, Mood.STRESSED],
+    moods: [
+      Mood.SAD, Mood.ANGRY, Mood.SICK, Mood.STRESSED, Mood.ANXIOUS,
+      Mood.LONELY, Mood.HURT, Mood.JEALOUS, Mood.OVERWHELMED, Mood.GUILTY
+    ],
     baseColor: 'bg-[#dbeafe]' // Blue-100
   }
 };
@@ -116,17 +141,35 @@ export const MOOD_COLORS: Record<Mood, string> = {
   [Mood.ROMANTIC]: 'bg-pink-200',
   [Mood.CHILL]: 'bg-purple-200',
   [Mood.GRATEFUL]: 'bg-teal-200',
+  [Mood.PLAYFUL]: 'bg-lime-200',
+  [Mood.PROUD]: 'bg-amber-200',
+  [Mood.SAFE]: 'bg-emerald-200',
+  [Mood.HOPEFUL]: 'bg-sky-200',
+  [Mood.ENERGETIC]: 'bg-red-200', // Energetic often red/orange
   
   // Neutral
-  [Mood.HUNGRY]: 'bg-lime-200',
+  [Mood.HUNGRY]: 'bg-orange-100',
   [Mood.TIRED]: 'bg-slate-200',
-  [Mood.CONFUSED]: 'bg-amber-100', // Beige
+  [Mood.CONFUSED]: 'bg-stone-200',
+  [Mood.BORED]: 'bg-gray-200',
+  [Mood.BUSY]: 'bg-blue-100',
+  [Mood.FOCUSED]: 'bg-indigo-100',
+  [Mood.NUMB]: 'bg-gray-300',
+  [Mood.MEH]: 'bg-zinc-200',
+  [Mood.COZY]: 'bg-orange-50',
+  [Mood.WOBBLY]: 'bg-violet-100',
 
   // Negative
   [Mood.SAD]: 'bg-blue-200',
-  [Mood.ANGRY]: 'bg-red-200',
-  [Mood.SICK]: 'bg-emerald-100', // Sickly green
+  [Mood.ANGRY]: 'bg-red-300',
+  [Mood.SICK]: 'bg-green-100',
   [Mood.STRESSED]: 'bg-rose-200',
+  [Mood.ANXIOUS]: 'bg-cyan-200',
+  [Mood.LONELY]: 'bg-indigo-200',
+  [Mood.HURT]: 'bg-fuchsia-200',
+  [Mood.JEALOUS]: 'bg-lime-300',
+  [Mood.OVERWHELMED]: 'bg-orange-300',
+  [Mood.GUILTY]: 'bg-stone-300',
 };
 
 // --- ACTION CONFIGURATION ---
@@ -134,7 +177,7 @@ export const MOOD_COLORS: Record<Mood, string> = {
 export interface ActionItem {
   id: string;
   label: string;
-  icon: string; // We'll map string to Lucide icon in component
+  icon: string; 
   color: string;
 }
 

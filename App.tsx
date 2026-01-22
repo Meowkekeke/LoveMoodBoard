@@ -3,6 +3,7 @@ import { Sprout, Copy, LogOut, Settings, Trash2, Eraser, X, Bell, Plus, Users, U
 import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom, startConversation, activateSpaceMode, endSpaceMode, checkAndEndSpaceMode } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
+import { MoodIcon } from './components/MoodIcon';
 import { MoodEditor } from './components/MoodEditor';
 import { DoodleButton } from './components/DoodleButton';
 import { SocialBattery } from './components/SocialBattery';
@@ -37,6 +38,8 @@ const sendNotification = (title: string, body: string) => {
   }
 };
 
+const MOOD_EXPIRY_MS = 5 * 60 * 60 * 1000; // 5 Hours
+
 const App: React.FC = () => {
   // Application State
   const [userId] = useState(getUserId());
@@ -70,7 +73,7 @@ const App: React.FC = () => {
     }
   }, []);
 
-  // Subscription Effect - CRITICAL FIX: Only depend on roomCode
+  // Subscription Effect
   useEffect(() => {
     if (!roomCode) return;
 
@@ -91,7 +94,7 @@ const App: React.FC = () => {
     }
   }, [roomCode]); 
 
-  // Space Mode Expiry Check - Optimized
+  // Space Mode Expiry Check
   useEffect(() => {
     if (!roomData?.spaceMode?.isActive || !roomCode) return;
 
@@ -99,10 +102,7 @@ const App: React.FC = () => {
     const now = Date.now();
     const timeLeft = endTime - now;
 
-    // Helper to end space mode
     const tryEndSpaceMode = () => {
-        // Only allow Host to trigger the DB update to prevent race conditions/double writes
-        // unless host is absent, but keeping it simple for now.
         if (roomData.hostId === userId) {
             checkAndEndSpaceMode(roomData, roomCode);
         }
@@ -111,11 +111,33 @@ const App: React.FC = () => {
     if (timeLeft <= 0) {
         tryEndSpaceMode();
     } else {
-        const timer = setTimeout(tryEndSpaceMode, timeLeft + 500); // +500ms buffer
+        const timer = setTimeout(tryEndSpaceMode, timeLeft + 500); 
         return () => clearTimeout(timer);
     }
   }, [roomData?.spaceMode?.isActive, roomData?.spaceMode?.endTime, roomCode, userId]);
 
+  // Forced Mood Update Check (Every 5 Hours)
+  useEffect(() => {
+    if (!roomData || showNameModal) return;
+    
+    const checkMoodExpiry = () => {
+        const myState = roomData.hostId === userId ? roomData.hostState : roomData.guestState;
+        // Don't force if in space mode
+        if (roomData.spaceMode?.isActive) return;
+
+        const timeSinceUpdate = Date.now() - myState.lastUpdated;
+        
+        // If expired and not already editing, force open
+        if (timeSinceUpdate > MOOD_EXPIRY_MS && !isEditing) {
+            setIsEditing(true);
+        }
+    };
+
+    const interval = setInterval(checkMoodExpiry, 60000); // Check every minute
+    checkMoodExpiry(); // Check immediately
+
+    return () => clearInterval(interval);
+  }, [roomData, userId, isEditing, showNameModal]);
 
   // Notification Logic
   useEffect(() => {
@@ -124,11 +146,8 @@ const App: React.FC = () => {
     const isSpaceActive = roomData.spaceMode?.isActive && (roomData.spaceMode.endTime > Date.now());
     const amITakingSpace = isSpaceActive && roomData.spaceMode?.initiatorId === userId;
     
-    // If I am taking space, I don't need notifications about new logs, 
-    // but I should update the ref so when I come back I don't get flooded.
     if (amITakingSpace) {
         prevLogsLength.current = roomData.logs.length;
-        // Also update interaction timestamp so we don't get pinged
         const myData = roomData.hostId === userId ? roomData.hostState : roomData.guestState;
         if (myData.pendingInteraction) {
             prevInteractionTimestamp.current = myData.pendingInteraction.timestamp;
@@ -136,20 +155,14 @@ const App: React.FC = () => {
         return;
     }
 
-    // New Logs Notification
     if (roomData.logs.length > prevLogsLength.current) {
         const newLog = roomData.logs[roomData.logs.length - 1];
-        // Only notify if it's not my own log
         if (newLog.userId !== userId && newLog.userId !== 'SHARED') {
             sendNotification('New Note 🌱', `${newLog.userName}: ${newLog.note}`);
-        } else if (newLog.userId === 'SHARED' && newLog.type === 'conversation' && !isChatMinimized) {
-            // Optional: Notify for conversation logs if minimized? 
-            // For now, let's keep it simple.
         }
     }
     prevLogsLength.current = roomData.logs.length;
 
-    // Interaction Notification
     const myState = roomData.hostId === userId ? roomData.hostState : roomData.guestState;
     if (myState.pendingInteraction) {
         if (myState.pendingInteraction.timestamp > prevInteractionTimestamp.current) {
@@ -157,7 +170,7 @@ const App: React.FC = () => {
             prevInteractionTimestamp.current = myState.pendingInteraction.timestamp;
         }
     }
-  }, [roomData, userId]); // Keep roomData here as we explicitly want to react to data changes
+  }, [roomData, userId]);
 
 
   useEffect(() => {
@@ -169,7 +182,6 @@ const App: React.FC = () => {
   // Derived Data
   const isSpaceActive = roomData?.spaceMode?.isActive && (roomData.spaceMode.endTime > Date.now());
   const amITakingSpace = isSpaceActive && roomData?.spaceMode?.initiatorId === userId;
-  const isPartnerTakingSpace = isSpaceActive && !amITakingSpace;
 
   const handleCreateRoom = async () => {
     if (!userName.trim()) { setShowNameModal(true); return; }
@@ -204,7 +216,6 @@ const App: React.FC = () => {
     if (!roomCode) return;
     if (category === 'rough' && label !== 'Other') { setIsMenuOpen(false); setPendingRoughLog({ icon, label }); return; }
     try {
-      // If label is "Other" but passed here, it means MenuModal already handled input
       const logId = await logMood(roomCode, userId, userName, null, label, { category, icon });
       if (category === 'needs') {
         await startConversation(roomCode, `${userName} posted: ${label}`, 'needs', logId);
@@ -295,10 +306,6 @@ const App: React.FC = () => {
     if (roomCode) { navigator.clipboard.writeText(roomCode); alert('Copied!'); }
   };
 
-  const enableNotifications = () => {
-      Notification.requestPermission();
-  };
-
   const saveName = () => {
     if (userName.trim()) {
       localStorage.setItem('lovesync_name', userName.trim());
@@ -307,24 +314,15 @@ const App: React.FC = () => {
   };
 
   // --- Render Logic ---
-
-  // Decorative Background Elements
   const BackgroundDoodles = () => (
     <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
       <Cloud className="absolute top-10 left-[-20px] text-green-200/40 w-32 h-32 animate-wiggle" style={{ animationDuration: '8s' }} strokeWidth={1.5} />
       <Cloud className="absolute top-40 right-[-40px] text-green-200/40 w-40 h-40 animate-wiggle" style={{ animationDuration: '10s', animationDelay: '1s' }} strokeWidth={1.5} />
       <Sun className="absolute top-8 right-8 text-yellow-300/40 w-24 h-24 animate-spin-slow" style={{ animationDuration: '20s' }} strokeWidth={1.5} />
-      
-      {/* Scattered Organic Elements */}
       <Flower className="absolute bottom-1/4 left-10 text-pink-200/50 w-12 h-12 animate-bounce-in" strokeWidth={1.5} />
       <Leaf className="absolute bottom-20 right-20 text-green-300/50 w-16 h-16 rotate-45" strokeWidth={1.5} />
       <Heart className="absolute top-1/3 left-1/4 text-red-200/30 w-8 h-8 -rotate-12" strokeWidth={1.5} />
       <Star className="absolute bottom-1/3 right-10 text-yellow-200/50 w-10 h-10 rotate-12" strokeWidth={1.5} />
-      
-      {/* Little dots */}
-      <div className="absolute top-20 left-20 w-2 h-2 bg-green-300/30 rounded-full"></div>
-      <div className="absolute top-60 right-1/3 w-3 h-3 bg-yellow-300/30 rounded-full"></div>
-      <div className="absolute bottom-10 left-1/2 w-2 h-2 bg-pink-300/30 rounded-full"></div>
     </div>
   );
 
@@ -352,7 +350,7 @@ const App: React.FC = () => {
     );
   }
 
-  // 2. Landing Page (No Room)
+  // 2. Landing Page
   if (!roomCode) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center max-w-lg mx-auto relative overflow-hidden">
@@ -370,19 +368,11 @@ const App: React.FC = () => {
                {error}
              </div>
            )}
-
            <div>
              <DoodleButton onClick={handleCreateRoom} disabled={isLoading} className="w-full text-2xl py-5 rounded-2xl">
                {isLoading ? 'Planting Seeds...' : 'Create New Garden'}
              </DoodleButton>
-             <p className="text-base text-gray-500 mt-3 font-bold">Start a new space for you two</p>
            </div>
-
-           <div className="relative flex items-center justify-center py-2">
-             <div className="border-t-4 border-black/10 w-full absolute border-dashed"></div>
-             <div className="bg-white px-4 relative z-10 font-bold text-xl text-gray-400 rotate-12">OR</div>
-           </div>
-
            <div>
              <input
                type="text"
@@ -401,7 +391,7 @@ const App: React.FC = () => {
     );
   }
 
-  // 3. Dashboard (In Room)
+  // 3. Dashboard
   if (!roomData) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center">
@@ -419,9 +409,7 @@ const App: React.FC = () => {
   const partnerState = isHost ? roomData.guestState : roomData.hostState;
   const partnerName = (isHost && !roomData.guestId) ? 'Partner' : partnerState.name;
   
-  const logs = roomData.logs || []; 
-  // Unified Feed: Sort all logs by timestamp, newest first
-  const sortedLogs = [...logs].sort((a, b) => b.timestamp - a.timestamp);
+  const sortedLogs = [...(roomData.logs || [])].sort((a, b) => b.timestamp - a.timestamp);
 
   return (
     <div className="h-[100dvh] flex flex-col max-w-md md:max-w-2xl mx-auto relative overflow-hidden bg-transparent">
@@ -439,7 +427,7 @@ const App: React.FC = () => {
           </div>
       ) : (
       <>
-        {/* Header - Locked Location */}
+        {/* Header - Fixed & Consistent Fonts */}
         <header className="fixed top-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md pt-safe-top pb-3 px-4 shadow-md border-b-2 border-green-100 max-w-md md:max-w-2xl mx-auto rounded-b-2xl">
             <div className="flex justify-between items-center mb-3 pt-1">
                 <div className="flex items-center gap-2">
@@ -456,22 +444,28 @@ const App: React.FC = () => {
                 </div>
             </div>
 
-            {/* Batteries Row */}
+            {/* Batteries & Mood Row */}
             {roomData.guestId && (
                 <div className="flex gap-2">
-                     <div className="flex-1 p-2 rounded-xl border-2 border-green-200 bg-white shadow-sm">
-                         <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Me</p>
+                     <div className="flex-1 p-2 rounded-xl border-2 border-green-200 bg-white shadow-sm relative overflow-hidden">
+                         <div className="flex justify-between items-center mb-1">
+                            <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase">Me</p>
+                            <MoodIcon mood={myState.mood} className="w-5 h-5 text-gray-800" />
+                         </div>
                          <SocialBattery level={myState.socialBattery || 80} onUpdate={handleBatteryUpdate} />
                      </div>
-                     <div className="flex-1 p-2 rounded-xl border-2 border-gray-100 bg-gray-50/50">
-                         <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">{partnerName}</p>
+                     <div className="flex-1 p-2 rounded-xl border-2 border-gray-100 bg-gray-50/50 relative overflow-hidden">
+                         <div className="flex justify-between items-center mb-1">
+                             <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase">{partnerName}</p>
+                             <MoodIcon mood={partnerState.mood} className="w-5 h-5 text-gray-500" />
+                         </div>
                          <SocialBattery level={partnerState.socialBattery || 80} readOnly={true} />
                      </div>
                 </div>
             )}
         </header>
 
-        {/* Main Content Feed - With padding for fixed header */}
+        {/* Main Content Feed */}
         <main className="flex-1 overflow-y-auto px-4 py-4 pt-36 pb-32 space-y-6 overscroll-contain relative z-10 w-full">
             {sortedLogs.length === 0 ? (
                  <div className="text-center mt-20 p-8 bg-white/60 backdrop-blur-sm rounded-3xl border-2 border-dashed border-gray-300">
@@ -484,7 +478,6 @@ const App: React.FC = () => {
                 ))
             )}
             
-            {/* Connection Prompt at bottom if alone */}
             {!roomData.guestId && (
                  <div className="mt-4 p-4 bg-yellow-50/90 rounded-2xl border-2 border-yellow-200 text-center shadow-sm">
                     <p className="font-bold text-yellow-800 text-sm">Share code <span className="font-mono bg-white px-1 rounded mx-1">{roomCode}</span> to connect.</p>
@@ -494,7 +487,7 @@ const App: React.FC = () => {
       </>
       )}
 
-      {/* Interaction Modals & Overlays */}
+      {/* Interactions */}
       {myState.pendingInteraction && !amITakingSpace && !isSpaceActive && (
           <InteractionModal interaction={myState.pendingInteraction} onDismiss={handleDismissInteraction} />
       )}
@@ -514,7 +507,7 @@ const App: React.FC = () => {
          </div>
       )}
 
-      {/* Unified FAB */}
+      {/* FAB */}
       {(roomData.guestId && (!roomData.conversationActive || isChatMinimized) && !isSpaceActive) && (
           <div className="fixed bottom-6 right-6 z-40">
             <button 
@@ -529,7 +522,7 @@ const App: React.FC = () => {
       {/* Menu Modal */}
       {isMenuOpen && (
         <MenuModal 
-          type="me" // Unified type
+          type="me" 
           partnerName={partnerName}
           onClose={() => setIsMenuOpen(false)}
           onOpenMoodEditor={() => { setIsMenuOpen(false); setIsEditing(true); }}
