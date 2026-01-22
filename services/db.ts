@@ -207,11 +207,12 @@ export const deleteRoom = async (code: string) => {
 
 // --- CONVERSATION ZONE HELPERS ---
 
-export const startConversation = async (code: string, topic: string) => {
+export const startConversation = async (code: string, topic: string, trigger: 'rough' | 'needs' = 'needs') => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
   await updateDoc(roomRef, {
     conversationActive: true,
     conversationTopic: topic,
+    conversationTrigger: trigger,
     messages: [] // Reset messages for new topic
   });
 };
@@ -239,12 +240,18 @@ export const endConversation = async (code: string) => {
   if (snap.exists()) {
     const data = snap.data() as RoomData;
     
+    // Determine title based on trigger
+    let title = 'Heart-to-Heart'; // Default for 'rough'
+    if (data.conversationTrigger === 'needs') {
+      title = 'Game Plan';
+    }
+
     // Only archive if there are messages
     if (data.messages && data.messages.length > 0) {
       const archiveEntry: MoodEntry = {
         id: crypto.randomUUID(),
-        userId: 'system',
-        userName: 'LoveSync',
+        userId: 'SHARED', // Special ID for shared logs
+        userName: title, 
         type: 'conversation',
         note: data.conversationTopic || 'Conversation',
         messages: data.messages,

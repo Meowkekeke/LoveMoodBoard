@@ -106,7 +106,7 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe }) => {
                 
                 <div className="flex justify-between items-start mb-1">
                     <h3 className="font-bold text-lg text-black leading-none tracking-tight">
-                      {data.type === 'conversation' ? 'Heart-to-Heart' : data.name}
+                      {data.name}
                     </h3>
                     <div className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-full border-2 border-gray-100 flex items-center gap-1">
                       <Clock size={10} />

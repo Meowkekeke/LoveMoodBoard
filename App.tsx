@@ -139,7 +139,8 @@ const App: React.FC = () => {
       
       // If category is NEEDS, start conversation immediately
       if (category === 'needs') {
-        await startConversation(roomCode, `${userName} posted: ${label}`);
+        // TRIGGER TYPE: needs
+        await startConversation(roomCode, `${userName} posted: ${label}`, 'needs');
       }
     } catch (err) {
       console.error("Failed to log action", err);
@@ -156,7 +157,8 @@ const App: React.FC = () => {
       setPendingRoughLog(null);
 
       // Trigger Conversation
-      await startConversation(roomCode, `${userName} is having a rough time: ${combinedNote}`);
+      // TRIGGER TYPE: rough
+      await startConversation(roomCode, `${userName} is having a rough time: ${combinedNote}`, 'rough');
 
     } catch (err) {
       console.error("Failed to log rough action", err);
@@ -387,8 +389,12 @@ const App: React.FC = () => {
 
   const logs = roomData.logs || []; 
   const sortedLogs = [...logs].sort((a, b) => b.timestamp - a.timestamp);
-  const myLogs = sortedLogs.filter(l => l.userId === userId);
-  const partnerLogs = sortedLogs.filter(l => l.userId !== userId);
+  
+  // Filter Logs
+  // Include my logs OR shared conversations
+  const myLogs = sortedLogs.filter(l => l.userId === userId || l.userId === 'SHARED');
+  // Include partner logs OR shared conversations
+  const partnerLogs = sortedLogs.filter(l => (l.userId !== userId && l.userId !== 'SHARED') || l.userId === 'SHARED');
 
   return (
     <div className="h-[100dvh] p-4 flex flex-col max-w-md md:max-w-2xl mx-auto relative overflow-hidden">
@@ -479,9 +485,10 @@ const App: React.FC = () => {
                                 category: log.category,
                                 icon: log.icon,
                                 note: log.note,
-                                timestamp: log.timestamp
+                                timestamp: log.timestamp,
+                                messages: log.messages
                             }}
-                            isMe={true}
+                            isMe={log.userId === userId || log.userId === 'SHARED'} // Highlight shared as 'me' style or similar?
                         />
                     ))
                 )}
@@ -517,7 +524,8 @@ const App: React.FC = () => {
                                     category: log.category,
                                     icon: log.icon,
                                     note: log.note,
-                                    timestamp: log.timestamp
+                                    timestamp: log.timestamp,
+                                    messages: log.messages
                                 }}
                                 isMe={false}
                             />

@@ -69,6 +69,7 @@ export interface RoomData {
   // Conversation Zone State
   conversationActive?: boolean;
   conversationTopic?: string;
+  conversationTrigger?: 'rough' | 'needs'; // Track source
   messages?: ChatMessage[];
 }
 
