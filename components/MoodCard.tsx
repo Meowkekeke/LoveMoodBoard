@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from 'react';
 import { MOOD_COLORS, Mood, ChatMessage } from '../types';
-import { Clock, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { Clock, ChevronDown, ChevronUp, MessageCircle, Check } from 'lucide-react';
 import { MoodIcon } from './MoodIcon';
 import { 
   Flower2, Footprints, Activity, Dumbbell, BookOpen, Palette, Droplet, 
   Briefcase, Moon, BatteryLow, Frown, Wind, Thermometer, Edit3, 
-  MessageCircle, Heart, MoonStar, Home, Ear, Ghost 
+  Heart, MoonStar, Home, Ear, Ghost 
 } from 'lucide-react';
 
 // Re-map icons here
@@ -40,7 +40,7 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe, isShared = false
 
   if (data.type === 'mood' && data.mood) {
     bgColor = MOOD_COLORS[data.mood];
-    IconComponent = <MoodIcon mood={data.mood} className="w-10 h-10 sm:w-12 sm:h-12 text-black/90" />;
+    IconComponent = <MoodIcon mood={data.mood} className="w-12 h-12 sm:w-14 sm:h-14 text-black/90" />;
   } else if (data.type === 'action' && data.icon) {
     // Action Colors
     if (data.category === 'self_care') bgColor = 'bg-green-200';
@@ -48,91 +48,124 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe, isShared = false
     if (data.category === 'needs') bgColor = 'bg-purple-200'; 
     
     const LucideIcon = IconMap[data.icon] || Edit3;
-    IconComponent = <LucideIcon size={40} className="text-black/80" strokeWidth={2.5} />;
+    IconComponent = <LucideIcon size={48} className="text-black/80" strokeWidth={2.5} />;
   } else if (data.type === 'conversation') {
     bgColor = 'bg-blue-200';
     IconComponent = (
       <div className="bg-white rounded-full p-2 border-4 border-blue-300">
-         <Check size={28} className="text-green-600" strokeWidth={4} />
+         <Check size={36} className="text-green-600" strokeWidth={4} />
       </div>
     );
   }
 
   // Format time to exact date & time
   const getTimeString = (timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(timestamp).toLocaleString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   // Deterministic "random" styles
   const style = useMemo(() => {
     const hash = data.name.length + data.note.length + data.timestamp;
     const rotations = ['rotate-1', '-rotate-1', 'rotate-2', '-rotate-2', 'rotate-0'];
+    const tapePositions = ['left-[10%]', 'left-[30%]', 'right-[15%]', 'left-[50%] -translate-x-1/2'];
+    const tapeRotations = ['rotate-[-3deg]', 'rotate-[2deg]', 'rotate-[-5deg]', 'rotate-[4deg]'];
+    
     return {
       rotation: rotations[hash % rotations.length],
+      tapePos: tapePositions[hash % tapePositions.length],
+      tapeRot: tapeRotations[hash % tapeRotations.length],
     };
   }, [data.note, data.timestamp, data.name]);
 
   const hasMessages = data.messages && data.messages.length > 0;
-  
-  // Alignment logic: ME = Right aligned container, PARTNER = Left aligned
-  const alignClass = isMe ? 'ml-auto' : 'mr-auto';
-  const roundedClass = isMe ? 'rounded-tr-none' : 'rounded-tl-none';
 
   return (
-    <div className={`relative group w-[95%] max-w-sm mb-6 ${alignClass} ${style.rotation} transition-transform hover:z-10`}>
-       
-       {/* Timestamp floating outside */}
-       <div className={`absolute -top-6 ${isMe ? 'right-2' : 'left-2'} text-xs font-bold text-gray-400 flex items-center gap-1`}>
-          <Clock size={10} /> {getTimeString(data.timestamp)}
-       </div>
+    <div className={`relative group w-full max-w-md mx-auto mb-6 ${style.rotation} transition-transform hover:scale-[1.01] hover:z-10`}>
+       {/* Tape */}
+       <div className={`
+         absolute -top-3 ${style.tapePos} w-16 h-8 
+         ${data.type === 'conversation' ? 'bg-blue-300/90' : (data.type === 'action' ? 'bg-purple-300/90' : 'bg-[#fde047]/90')} 
+         backdrop-blur-sm border-2 border-black/10 ${style.tapeRot} z-20 shadow-sm clip-path-tape opacity-95
+       `}></div>
 
        {/* Card Body */}
-       <div className={`flex w-full bg-white border-4 border-black rounded-[1.5rem] ${roundedClass} shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] overflow-hidden`}>
+       <div className="flex flex-col w-full bg-white border-4 border-black rounded-[2rem] shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
           
-          {/* Layout: Icon on Left for Partner, Right for Me */}
-          <div className={`flex w-full ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-            
-            {/* Icon Column */}
-            <div className={`w-[80px] shrink-0 ${bgColor} ${isMe ? 'border-l-4' : 'border-r-4'} border-black flex flex-col items-center justify-center p-2 relative`}>
-                <div className="transform transition-transform group-hover:scale-110 duration-200">
+          <div className="flex w-full min-h-[110px]">
+            {/* LHS: Icon Area */}
+            <div className={`w-[30%] min-w-[85px] ${bgColor} border-r-4 border-black flex flex-col items-center justify-center p-3 relative`}>
+                {isMe && !isShared && (
+                  <div className="absolute top-2 left-2 bg-black text-white text-[10px] px-2 py-0.5 rounded-full font-bold tracking-widest z-10 -rotate-12 shadow-sm">
+                    YOU
+                  </div>
+                )}
+                {isShared && (
+                  <div className="absolute top-2 left-2 bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full font-bold tracking-widest z-10 -rotate-12 shadow-sm">
+                    US
+                  </div>
+                )}
+                <div className="transform transition-transform group-hover:scale-110 group-hover:rotate-6 duration-300 drop-shadow-sm">
                   {IconComponent}
                 </div>
             </div>
 
-            {/* Content Column */}
-            <div className="flex-1 p-3 flex flex-col justify-center relative bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')] min-w-0">
-                <div className="relative">
-                    <p className={`font-[Patrick_Hand] text-xl leading-snug text-gray-800 break-words w-full ${isMe ? 'text-right' : 'text-left'}`}>
+            {/* RHS: Content Area */}
+            <div className="w-[70%] p-4 flex flex-col justify-center relative bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]">
+                
+                <div className="flex justify-between items-start mb-1">
+                    <h3 className="font-bold text-lg text-black leading-none tracking-tight">
+                      {data.name}
+                    </h3>
+                    <div className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded-full border-2 border-gray-100 flex items-center gap-1">
+                      <Clock size={10} />
+                      {getTimeString(data.timestamp)}
+                    </div>
+                </div>
+                
+                <div className="relative pt-1">
+                    <p className="font-[Patrick_Hand] text-xl leading-6 text-gray-800 break-words w-full">
                         {data.note}
                     </p>
                 </div>
 
-                {/* Conversation Footer */}
+                {/* Expansion for Conversation */}
                 {data.type === 'conversation' && hasMessages && (
                   <button 
                     onClick={() => setExpanded(!expanded)}
-                    className={`mt-2 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-blue-600 hover:text-blue-800 transition-colors ${isMe ? 'justify-end' : 'justify-start'}`}
+                    className="mt-3 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-blue-600 hover:text-blue-800 transition-colors"
                   >
-                    {expanded ? 'Hide Chat' : 'View Chat'}
-                    {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                    {expanded ? 'Close Chat' : 'Read Chat'}
+                    {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   </button>
+                )}
+                
+                {data.type === 'conversation' && !hasMessages && (
+                    <span className="mt-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        Resolved offline
+                    </span>
                 )}
             </div>
           </div>
-       </div>
 
-       {/* Expanded Chat History */}
-       {expanded && data.messages && (
-        <div className="mt-2 bg-white/80 backdrop-blur-sm border-2 border-black/20 rounded-xl p-3 space-y-2 max-h-48 overflow-y-auto mx-1 shadow-inner">
-            {data.messages.map(msg => (
-                <div key={msg.id} className={`flex flex-col ${msg.senderId === data.userId ? 'items-end' : 'items-start'}`}>
-                <div className={`px-2 py-1 rounded-lg text-sm font-[Patrick_Hand] border ${msg.senderId === data.userId ? 'bg-blue-100 border-blue-200' : 'bg-white border-gray-200'}`}>
-                    {msg.text}
-                </div>
-                </div>
-            ))}
-        </div>
-       )}
+          {/* Expanded Chat History */}
+          {expanded && data.messages && (
+            <div className="bg-gray-50 border-t-4 border-black p-4 space-y-3 max-h-60 overflow-y-auto">
+               {data.messages.map(msg => (
+                 <div key={msg.id} className={`flex flex-col ${msg.senderId === data.userId ? 'items-end' : (msg.senderName ? 'items-start' : 'items-start')}`}>
+                    <span className="text-[10px] font-bold text-gray-400 mb-0.5">{msg.senderName}</span>
+                    <div className="px-3 py-2 rounded-xl text-sm font-[Patrick_Hand] bg-white border border-gray-200 text-gray-800">
+                      {msg.text}
+                    </div>
+                 </div>
+               ))}
+            </div>
+          )}
+
+       </div>
     </div>
   );
 };
