@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, X, MessageCircle, HeartHandshake } from 'lucide-react';
+import { Send, X, MessageCircle, HeartHandshake, Minus } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { sendChatMessage, endConversation } from '../services/db';
 
@@ -9,9 +9,10 @@ interface ConversationZoneProps {
   userName: string;
   topic: string;
   messages: ChatMessage[];
+  onMinimize: () => void;
 }
 
-export const ConversationZone: React.FC<ConversationZoneProps> = ({ roomCode, userId, userName, topic, messages }) => {
+export const ConversationZone: React.FC<ConversationZoneProps> = ({ roomCode, userId, userName, topic, messages, onMinimize }) => {
   const [inputText, setInputText] = useState('');
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -49,7 +50,8 @@ export const ConversationZone: React.FC<ConversationZoneProps> = ({ roomCode, us
         {/* Cute Header */}
         <div className="bg-blue-400 p-4 pt-6 pb-4 shrink-0 relative">
            <div className="absolute top-0 left-0 w-full h-4 bg-blue-300 rounded-t-[2.5rem] opacity-50"></div>
-           <div className="flex justify-between items-center relative z-10">
+           
+           <div className="flex justify-between items-start relative z-10 mb-2">
               <div className="flex items-center gap-2 text-white">
                 <div className="bg-white/20 p-2 rounded-full backdrop-blur-md">
                    <MessageCircle size={24} className="fill-white" />
@@ -60,20 +62,30 @@ export const ConversationZone: React.FC<ConversationZoneProps> = ({ roomCode, us
                 </div>
               </div>
               
+              <div className="flex gap-2">
+                <button 
+                  onClick={onMinimize}
+                  className="bg-blue-500 hover:bg-blue-600 text-white p-2 rounded-full transition-colors shadow-sm"
+                  title="Minimize"
+                >
+                  <Minus size={18} strokeWidth={3} />
+                </button>
+              </div>
+           </div>
+           
+           {/* Topic Pill */}
+           <div className="mt-2 bg-white/20 backdrop-blur-md rounded-xl p-3 text-center border-2 border-white/30 flex flex-col gap-2">
+              <p className="text-white font-[Patrick_Hand] text-lg leading-tight drop-shadow-sm">
+                "{topic}"
+              </p>
+              
               <button 
                 onClick={handleEnd}
-                className="bg-white text-blue-500 px-3 py-1.5 rounded-full font-bold text-xs shadow-sm hover:bg-blue-50 transition-colors flex items-center gap-1 border-2 border-transparent hover:border-blue-200"
+                className="self-center bg-white text-blue-500 px-4 py-1.5 rounded-full font-bold text-xs shadow-sm hover:bg-blue-50 transition-colors flex items-center gap-1 border-2 border-transparent hover:border-blue-200"
               >
                 <HeartHandshake size={14} />
                 We're Good
               </button>
-           </div>
-           
-           {/* Topic Pill */}
-           <div className="mt-4 bg-white/20 backdrop-blur-md rounded-xl p-3 text-center border-2 border-white/30">
-              <p className="text-white font-[Patrick_Hand] text-lg leading-tight drop-shadow-sm">
-                "{topic}"
-              </p>
            </div>
         </div>
 

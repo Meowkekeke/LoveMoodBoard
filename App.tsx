@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles } from 'lucide-react';
+import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles, MessageCircle } from 'lucide-react';
 import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom, startConversation } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
@@ -38,6 +38,7 @@ const App: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false); // Controls FAB Menu
   const [showNameModal, setShowNameModal] = useState(!localStorage.getItem('lovesync_name'));
   const [showSettings, setShowSettings] = useState(false);
+  const [isChatMinimized, setIsChatMinimized] = useState(false);
   
   // Modal State for Interactions
   const [sentInteractionData, setSentInteractionData] = useState<{ type: InteractionType; partnerName: string } | null>(null);
@@ -59,12 +60,18 @@ const App: React.FC = () => {
         setError('The garden was destroyed.');
         return;
       }
-
       setRoomData(data);
     });
 
     return () => unsubscribe();
   }, [roomCode, userId]);
+
+  // Reset minimized state if conversation actually ends or new one starts
+  useEffect(() => {
+    if (roomData && !roomData.conversationActive) {
+        setIsChatMinimized(false);
+    }
+  }, [roomData?.conversationActive]);
 
   // Actions
   const handleCreateRoom = async () => {
@@ -142,6 +149,7 @@ const App: React.FC = () => {
       if (category === 'needs') {
         // TRIGGER TYPE: needs
         await startConversation(roomCode, `${userName} posted: ${label}`, 'needs', logId);
+        setIsChatMinimized(false); // Ensure chat opens
       }
     } catch (err) {
       console.error("Failed to log action", err);
@@ -161,6 +169,7 @@ const App: React.FC = () => {
 
       // Trigger Conversation passing the log ID to source it
       await startConversation(roomCode, `${userName} is having a rough time: ${combinedNote}`, 'rough', logId);
+      setIsChatMinimized(false); // Ensure chat opens
 
     } catch (err) {
       console.error("Failed to log rough action", err);
@@ -575,18 +584,40 @@ const App: React.FC = () => {
       )}
       
       {/* CONVERSATION ZONE OVERLAY */}
-      {roomData.conversationActive && (
+      {roomData.conversationActive && !isChatMinimized && (
         <ConversationZone 
           roomCode={roomCode}
           userId={userId}
           userName={userName}
           topic={roomData.conversationTopic || 'General Chat'}
           messages={roomData.messages || []}
+          onMinimize={() => setIsChatMinimized(true)}
         />
       )}
+      
+      {/* Minimized Chat Bubble */}
+      {roomData.conversationActive && isChatMinimized && (
+         <div className="fixed bottom-6 left-6 z-40">
+            <button 
+              onClick={() => setIsChatMinimized(false)}
+              className="w-16 h-16 bg-blue-500 border-4 border-white rounded-full shadow-[0px_4px_12px_rgba(59,130,246,0.5)] flex items-center justify-center animate-bounce hover:scale-105 transition-transform"
+            >
+              <MessageCircle size={32} className="text-white fill-white" />
+              <span className="absolute -top-1 -right-1 flex h-4 w-4">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500"></span>
+              </span>
+            </button>
+         </div>
+      )}
 
-      {/* Floating Action Button */}
-      {(roomData.guestId && !roomData.conversationActive) && (
+      {/* Floating Action Button - Only show if conversation NOT active (minimized or not, we might want to hide regular fab to focus on chat, OR show regular fab if minimized? 
+          Requirement: "it stays in a letter icon". Let's assume standard FAB can coexist if chat is minimized, OR hidden. 
+          Given the importance of the chat, let's keep FAB hidden if conversation is active to prioritize resolution, 
+          BUT if user minimized it, maybe they want to do other things. 
+          Let's SHOW FAB if minimized, hide if full screen.
+      */}
+      {(roomData.guestId && (!roomData.conversationActive || isChatMinimized)) && (
           <div className="fixed bottom-6 right-6 z-40">
             <button 
                 onClick={() => setIsMenuOpen(true)}
