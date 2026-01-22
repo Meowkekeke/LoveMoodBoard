@@ -62,6 +62,7 @@ export interface SpaceModeState {
   initiatorId: string;
   initiatorName: string;
   endTime: number;
+  reason?: string; // Added reason for taking space
 }
 
 export interface RoomData {

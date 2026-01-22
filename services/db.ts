@@ -212,7 +212,7 @@ export const deleteRoom = async (code: string) => {
 
 // --- SPACE MODE ---
 
-export const activateSpaceMode = async (code: string, userId: string, userName: string, durationMinutes: number) => {
+export const activateSpaceMode = async (code: string, userId: string, userName: string, durationMinutes: number, reason: string) => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
   
   const endTime = Date.now() + (durationMinutes * 60 * 1000);
@@ -221,7 +221,8 @@ export const activateSpaceMode = async (code: string, userId: string, userName: 
     isActive: true,
     initiatorId: userId,
     initiatorName: userName,
-    endTime: endTime
+    endTime: endTime,
+    reason: reason
   };
 
   // Log it as an action too so there is a record
@@ -233,7 +234,7 @@ export const activateSpaceMode = async (code: string, userId: string, userName: 
     type: 'action',
     category: 'rough',
     icon: 'Ghost',
-    note: `Taking space for ${durationMinutes}m`,
+    note: `Taking space: ${reason} (${durationMinutes}m)`,
     timestamp: Date.now()
   };
 
@@ -242,6 +243,13 @@ export const activateSpaceMode = async (code: string, userId: string, userName: 
     logs: arrayUnion(newEntry)
   });
 };
+
+export const endSpaceMode = async (code: string) => {
+    const roomRef = doc(db, ROOM_COLLECTION, code);
+    await updateDoc(roomRef, {
+        'spaceMode.isActive': false
+    });
+}
 
 export const checkAndEndSpaceMode = async (roomData: RoomData, code: string) => {
     if (roomData.spaceMode?.isActive && Date.now() > roomData.spaceMode.endTime) {

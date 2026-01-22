@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Sprout, Copy, LogOut, Heart, Cloud, Sun, Flower, Leaf, User, Users, Plus, Settings, Trash2, Eraser, X, Smile, Sparkles, MessageCircle, Bell, Ghost } from 'lucide-react';
-import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom, startConversation, activateSpaceMode, checkAndEndSpaceMode } from './services/db';
+import { createRoom, joinRoom, subscribeToRoom, logMood, sendInteraction, dismissInteraction, updateSocialBattery, clearRoomLogs, deleteRoom, startConversation, activateSpaceMode, endSpaceMode, checkAndEndSpaceMode } from './services/db';
 import { RoomData, Mood, InteractionType } from './types';
 import { MoodCard } from './components/MoodCard';
 import { MoodEditor } from './components/MoodEditor';
@@ -256,16 +256,25 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStartSpaceMode = async (minutes: number) => {
+  const handleStartSpaceMode = async (minutes: number, reason: string) => {
      if (!roomCode) return;
      try {
-         await activateSpaceMode(roomCode, userId, userName, minutes);
+         await activateSpaceMode(roomCode, userId, userName, minutes, reason);
          setShowSpaceDuration(false);
          // Clear any pending rough log if user switched flow, though unlikely via UI
          setPendingRoughLog(null);
      } catch (err) {
          console.error("Failed to start space mode", err);
      }
+  };
+
+  const handleEndSpaceEarly = async () => {
+    if (!roomCode) return;
+    try {
+        await endSpaceMode(roomCode);
+    } catch (err) {
+        console.error("Failed to end space mode", err);
+    }
   };
 
   const handleBatteryUpdate = async (level: number) => {
@@ -507,118 +516,120 @@ const App: React.FC = () => {
     <div className="h-[100dvh] p-4 flex flex-col max-w-md md:max-w-2xl mx-auto relative overflow-hidden">
       <BackgroundDoodles />
       
-      {/* Header */}
-      <header className="relative z-20 flex justify-between items-center mb-4 bg-white p-3 rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="bg-[#86efac] p-2 rounded-lg border-2 border-black">
-            <Sprout className="text-black w-5 h-5" />
+      {/* GLOBAL SPACE MODE BLOCKER */}
+      {isSpaceActive ? (
+          <div className="relative z-50 h-full">
+            <SpaceCountdown 
+              endTime={roomData.spaceMode!.endTime} 
+              initiatorName={roomData.spaceMode!.initiatorName}
+              isMe={amITakingSpace}
+              reason={roomData.spaceMode!.reason}
+              onEndEarly={amITakingSpace ? handleEndSpaceEarly : undefined}
+            />
           </div>
-          <h1 className="font-bold text-xl tracking-tight hidden sm:block">LoveSync</h1>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {/* Only show code if partner hasn't joined */}
-          {!isPartnerJoined && (
-            <button 
-                onClick={copyCode}
-                className="flex items-center gap-1 px-3 py-1.5 bg-[#fde047] hover:bg-[#facc15] border-2 border-black rounded-lg text-xs font-bold transition-all active:scale-95 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-            >
-                <span className="font-mono">{roomCode}</span>
-                <Copy size={12} />
+      ) : (
+      <>
+        {/* Header */}
+        <header className="relative z-20 flex justify-between items-center mb-4 bg-white p-3 rounded-2xl border-4 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] shrink-0">
+            <div className="flex items-center gap-2">
+            <div className="bg-[#86efac] p-2 rounded-lg border-2 border-black">
+                <Sprout className="text-black w-5 h-5" />
+            </div>
+            <h1 className="font-bold text-xl tracking-tight hidden sm:block">LoveSync</h1>
+            </div>
+            
+            <div className="flex items-center gap-2">
+            {/* Only show code if partner hasn't joined */}
+            {!isPartnerJoined && (
+                <button 
+                    onClick={copyCode}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-[#fde047] hover:bg-[#facc15] border-2 border-black rounded-lg text-xs font-bold transition-all active:scale-95 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                >
+                    <span className="font-mono">{roomCode}</span>
+                    <Copy size={12} />
+                </button>
+            )}
+
+            <button onClick={() => setShowSettings(true)} className="p-2 bg-white hover:bg-gray-100 border-2 border-black rounded-lg text-black transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
+                <Settings size={18} />
             </button>
-          )}
+            </div>
+        </header>
 
-          <button onClick={() => setShowSettings(true)} className="p-2 bg-white hover:bg-gray-100 border-2 border-black rounded-lg text-black transition-colors shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-[2px] active:shadow-none">
-            <Settings size={18} />
-          </button>
-        </div>
-      </header>
+        {/* Tabs */}
+        <nav className="relative z-20 flex gap-2 mb-4 shrink-0">
+            <button 
+            onClick={() => setActiveTab('me')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all min-w-0 ${
+                activeTab === 'me' 
+                ? 'bg-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]' 
+                : 'bg-black/5 border-transparent text-gray-500 hover:bg-black/10'
+            }`}
+            >
+            <User size={20} className="shrink-0" />
+            Me
+            </button>
+            <button 
+            onClick={() => setActiveTab('partner')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all min-w-0 ${
+                activeTab === 'partner' 
+                ? 'bg-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]' 
+                : 'bg-black/5 border-transparent text-gray-500 hover:bg-black/10'
+            }`}
+            >
+            <Users size={20} className="shrink-0" />
+            <span className="truncate">{partnerTabLabel}</span>
+            </button>
+        </nav>
 
-      {/* Tabs */}
-      <nav className="relative z-20 flex gap-2 mb-4 shrink-0">
-        <button 
-          onClick={() => setActiveTab('me')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all min-w-0 ${
-            activeTab === 'me' 
-              ? 'bg-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]' 
-              : 'bg-black/5 border-transparent text-gray-500 hover:bg-black/10'
-          }`}
-        >
-          <User size={20} className="shrink-0" />
-          Me
-        </button>
-        <button 
-          onClick={() => setActiveTab('partner')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl border-4 font-bold text-lg transition-all min-w-0 ${
-            activeTab === 'partner' 
-              ? 'bg-white border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] translate-y-[-2px]' 
-              : 'bg-black/5 border-transparent text-gray-500 hover:bg-black/10'
-          }`}
-        >
-          <Users size={20} className="shrink-0" />
-          <span className="truncate">{partnerTabLabel}</span>
-        </button>
-      </nav>
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col relative z-10 min-h-0">
+            
+            {/* Me Tab */}
+            {activeTab === 'me' && (
+            <section className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-300">
+                
+                {/* 1. Status Section */}
+                <div className="mb-4 shrink-0">
+                <SocialBattery 
+                    level={myState.socialBattery || 80} 
+                    onUpdate={handleBatteryUpdate} 
+                />
+                </div>
 
-      {/* Main Content */}
-      <main className="flex-1 flex flex-col relative z-10 min-h-0">
-        
-        {/* Me Tab */}
-        {activeTab === 'me' && (
-          <section className="flex flex-col h-full animate-in fade-in slide-in-from-left-4 duration-300">
-             
-             {/* 1. Status Section */}
-             <div className="mb-4 shrink-0">
-               <SocialBattery 
-                 level={myState.socialBattery || 80} 
-                 onUpdate={handleBatteryUpdate} 
-               />
-             </div>
+                {/* 2. Logs Feed (Scrollable) */}
+                <div className="flex-1 overflow-y-auto px-4 space-y-6 pb-24">
+                    {myLogs.length === 0 ? (
+                    <div className="text-center py-10 opacity-60">
+                        <p className="font-bold text-xl">No notes yet!</p>
+                    </div>
+                    ) : (
+                        myLogs.map(log => (
+                            <MoodCard 
+                                key={log.id} 
+                                data={{
+                                    name: log.userName,
+                                    type: log.type,
+                                    mood: log.mood,
+                                    category: log.category,
+                                    icon: log.icon,
+                                    note: log.note,
+                                    timestamp: log.timestamp,
+                                    messages: log.messages
+                                }}
+                                isMe={log.userId === userId} // Shared logs will be false, so no "YOU" badge if logic was strict, but we handle below
+                                isShared={log.userId === 'SHARED'}
+                            />
+                        ))
+                    )}
+                </div>
+            </section>
+            )}
 
-             {/* 2. Logs Feed (Scrollable) */}
-             <div className="flex-1 overflow-y-auto px-4 space-y-6 pb-24">
-                {myLogs.length === 0 ? (
-                  <div className="text-center py-10 opacity-60">
-                      <p className="font-bold text-xl">No notes yet!</p>
-                  </div>
-                ) : (
-                    myLogs.map(log => (
-                        <MoodCard 
-                            key={log.id} 
-                            data={{
-                                name: log.userName,
-                                type: log.type,
-                                mood: log.mood,
-                                category: log.category,
-                                icon: log.icon,
-                                note: log.note,
-                                timestamp: log.timestamp,
-                                messages: log.messages
-                            }}
-                            isMe={log.userId === userId} // Shared logs will be false, so no "YOU" badge if logic was strict, but we handle below
-                            isShared={log.userId === 'SHARED'}
-                        />
-                    ))
-                )}
-             </div>
-          </section>
-        )}
-
-        {/* Partner Tab */}
-        {activeTab === 'partner' && (
-          <section className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
-             {roomData.guestId ? (
-                <>
-                  {/* If Space Mode is active, handle blocking/showing timer */}
-                  {isSpaceActive ? (
-                      <div className="flex-1 flex items-center justify-center p-4">
-                           <SpaceCountdown 
-                              endTime={roomData.spaceMode!.endTime} 
-                              initiatorName={roomData.spaceMode!.initiatorName}
-                              isMe={amITakingSpace}
-                           />
-                      </div>
-                  ) : (
+            {/* Partner Tab */}
+            {activeTab === 'partner' && (
+            <section className="flex flex-col h-full animate-in fade-in slide-in-from-right-4 duration-300">
+                {roomData.guestId ? (
                     <>
                         <div className="mb-4 shrink-0">
                             <SocialBattery 
@@ -653,23 +664,23 @@ const App: React.FC = () => {
                             )}
                         </div>
                     </>
-                  )}
-                </>
-             ) : (
-                <div className="bg-white p-8 rounded-3xl border-4 border-black border-dashed text-center">
-                    <div className="animate-spin text-4xl mb-4">⏳</div>
-                    <p className="font-bold text-gray-500 text-xl">Waiting for partner...</p>
-                    <p className="mt-2">Share code: <span className="font-mono bg-[#fde047] px-2 py-1 rounded border-2 border-black">{roomCode}</span></p>
-                </div>
-             )}
-          </section>
-        )}
+                ) : (
+                    <div className="bg-white p-8 rounded-3xl border-4 border-black border-dashed text-center">
+                        <div className="animate-spin text-4xl mb-4">⏳</div>
+                        <p className="font-bold text-gray-500 text-xl">Waiting for partner...</p>
+                        <p className="mt-2">Share code: <span className="font-mono bg-[#fde047] px-2 py-1 rounded border-2 border-black">{roomCode}</span></p>
+                    </div>
+                )}
+            </section>
+            )}
 
-      </main>
+        </main>
+      </>
+      )}
 
       {/* Persistent Interaction Pop-up (Only shows when on ME tab) - RECEIVER */}
       {/* BLOCK INTERACTION if I am taking space */}
-      {activeTab === 'me' && myState.pendingInteraction && !amITakingSpace && (
+      {activeTab === 'me' && myState.pendingInteraction && !amITakingSpace && !isSpaceActive && (
           <InteractionModal 
             interaction={myState.pendingInteraction} 
             onDismiss={handleDismissInteraction}
@@ -702,11 +713,7 @@ const App: React.FC = () => {
       )}
       
       {/* CONVERSATION ZONE OVERLAY */}
-      {/* Don't show conversation if space mode is active? Or allow it? 
-          Requirement: "no matter what message the other person sends, the need space person cannot see it".
-          This implies chat should be hidden/suppressed for the space taker.
-      */}
-      {roomData.conversationActive && !isChatMinimized && !amITakingSpace && (
+      {roomData.conversationActive && !isChatMinimized && !amITakingSpace && !isSpaceActive && (
         <ConversationZone 
           roomCode={roomCode}
           userId={userId}
@@ -718,7 +725,7 @@ const App: React.FC = () => {
       )}
       
       {/* Minimized Chat Bubble */}
-      {roomData.conversationActive && isChatMinimized && !amITakingSpace && (
+      {roomData.conversationActive && isChatMinimized && !amITakingSpace && !isSpaceActive && (
          <div className="fixed bottom-6 left-6 z-40">
             <button 
               onClick={() => setIsChatMinimized(false)}
@@ -734,7 +741,7 @@ const App: React.FC = () => {
       )}
 
       {/* Floating Action Buttons */}
-      {(roomData.guestId && (!roomData.conversationActive || isChatMinimized)) && (
+      {(roomData.guestId && (!roomData.conversationActive || isChatMinimized) && !isSpaceActive) && (
           <div className="fixed bottom-6 right-6 z-40 flex items-end gap-3">
              {/* Space Button - Pill Shape */}
              <button
