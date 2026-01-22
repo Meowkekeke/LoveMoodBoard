@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { MOOD_COLORS, Mood, ChatMessage } from '../types';
-import { Clock, ChevronDown, ChevronUp, MessageCircle, CheckCircle } from 'lucide-react';
+import { Clock, ChevronDown, ChevronUp, MessageCircle, Check } from 'lucide-react';
 import { MoodIcon } from './MoodIcon';
 import { 
   Flower2, Footprints, Activity, Dumbbell, BookOpen, Palette, Droplet, 
@@ -51,7 +51,11 @@ export const MoodCard: React.FC<MoodCardProps> = ({ data, isMe, isShared = false
     IconComponent = <LucideIcon size={48} className="text-black/80" strokeWidth={2.5} />;
   } else if (data.type === 'conversation') {
     bgColor = 'bg-blue-200';
-    IconComponent = <CheckCircle size={48} className="text-blue-700" strokeWidth={3} />;
+    IconComponent = (
+      <div className="bg-white rounded-full p-2 border-4 border-blue-300">
+         <Check size={36} className="text-green-600" strokeWidth={4} />
+      </div>
+    );
   }
 
   // Format time to exact date & time

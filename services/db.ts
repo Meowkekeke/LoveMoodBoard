@@ -245,7 +245,7 @@ export const endConversation = async (code: string) => {
     const data = snap.data() as RoomData;
     
     // Determine title based on trigger
-    let title = 'Heart-to-Heart'; // Default for 'rough'
+    let title = 'Heart-to-Heart'; 
     if (data.conversationTrigger === 'needs') {
       title = 'Game Plan';
     }
@@ -253,12 +253,22 @@ export const endConversation = async (code: string) => {
     const logs = data.logs || [];
     const sourceId = data.conversationSourceLogId;
     
-    // Check if we can find the source log to patch
-    // This allows us to REPLACE the original log with the conversation log
-    const logIndex = logs.findIndex(l => l.id === sourceId);
+    // 1. Try to find log by exact ID
+    let logIndex = logs.findIndex(l => l.id === sourceId);
+
+    // 2. Heuristic Fallback: If exact ID not found, find the most recent log 
+    // that matches the trigger type. This fixes "initial log not changing" if ID is lost.
+    if (logIndex === -1 && data.conversationTrigger) {
+        for (let i = logs.length - 1; i >= 0; i--) {
+            const l = logs[i];
+            if (l.type === 'action' && l.category === data.conversationTrigger) {
+                logIndex = i;
+                break;
+            }
+        }
+    }
 
     // If we found the source log, update it regardless of message count 
-    // (This handles the "Talked IRL -> We're Good" flow where chat might be empty)
     if (logIndex !== -1) {
         const updatedLog = { ...logs[logIndex] };
         
@@ -267,9 +277,6 @@ export const endConversation = async (code: string) => {
         updatedLog.userId = 'SHARED'; // Visible to both
         updatedLog.userName = title; // 'Heart-to-Heart' or 'Game Plan'
         updatedLog.messages = data.messages || [];
-        
-        // Note: we keep the original updatedLog.note (e.g. "Bad Meeting • I need space") 
-        // as the subtitle/topic of the conversation card.
         
         const newLogs = [...logs];
         newLogs[logIndex] = updatedLog;
@@ -283,7 +290,7 @@ export const endConversation = async (code: string) => {
         });
 
     } else if (data.messages && data.messages.length > 0) {
-       // Fallback: If source not found (legacy) but messages exist, create new entry
+       // Fallback: create new entry only if we really couldn't find a source log
        const archiveEntry: MoodEntry = {
         id: crypto.randomUUID(),
         userId: 'SHARED', // Special ID for shared logs
@@ -302,7 +309,7 @@ export const endConversation = async (code: string) => {
         conversationSourceLogId: null
       });
     } else {
-      // Just close if empty and no source log to patch
+      // Just close if empty and no source log found to patch
       await updateDoc(roomRef, {
         conversationActive: false,
         conversationSourceLogId: null
