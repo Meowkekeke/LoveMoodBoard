@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { ACTION_CATEGORIES } from '../types';
 import { 
-  Flower2, Footprints, Activity, Dumbbell, BookOpen, Palette, Droplet, // Self Care
+  Flower2, Footprints, Activity, Dumbbell, BookOpen, Palette, Droplet, // Self Care (Legacy imports kept to prevent build error if mapped, though unused)
   Briefcase, Moon, BatteryLow, Frown, Wind, Thermometer, Edit3, // Rough
   MessageCircle, Heart, MoonStar, Home, Ear, Ghost // Needs
 } from 'lucide-react';
 
 interface ActionPanelProps {
-  onLogAction: (category: 'self_care'|'rough'|'needs', icon: string, label: string) => void;
+  onLogAction: (category: 'rough'|'needs', icon: string, label: string) => void;
 }
 
 const IconMap: Record<string, React.FC<any>> = {
@@ -37,7 +37,7 @@ const IconMap: Record<string, React.FC<any>> = {
 };
 
 export const ActionPanel: React.FC<ActionPanelProps> = ({ onLogAction }) => {
-  const [activeTab, setActiveTab] = useState<'self_care'|'rough'|'needs'>('self_care');
+  const [activeTab, setActiveTab] = useState<'rough'|'needs'>('needs');
 
   const config = ACTION_CATEGORIES[activeTab];
 

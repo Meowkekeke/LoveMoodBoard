@@ -45,7 +45,6 @@ const App: React.FC = () => {
   const [userName, setUserName] = useState<string>(localStorage.getItem('lovesync_name') || '');
   
   // UI State
-  const [activeTab, setActiveTab] = useState<'me' | 'partner'>('me');
   const [inputCode, setInputCode] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -201,10 +200,11 @@ const App: React.FC = () => {
     catch (err) { alert("Couldn't add note."); }
   };
 
-  const handleActionLog = async (category: 'self_care'|'rough'|'needs', icon: string, label: string) => {
+  const handleActionLog = async (category: 'rough'|'needs', icon: string, label: string) => {
     if (!roomCode) return;
-    if (category === 'rough') { setIsMenuOpen(false); setPendingRoughLog({ icon, label }); return; }
+    if (category === 'rough' && label !== 'Other') { setIsMenuOpen(false); setPendingRoughLog({ icon, label }); return; }
     try {
+      // If label is "Other" but passed here, it means MenuModal already handled input
       const logId = await logMood(roomCode, userId, userName, null, label, { category, icon });
       if (category === 'needs') {
         await startConversation(roomCode, `${userName} posted: ${label}`, 'needs', logId);
@@ -420,12 +420,11 @@ const App: React.FC = () => {
   const partnerName = (isHost && !roomData.guestId) ? 'Partner' : partnerState.name;
   
   const logs = roomData.logs || []; 
+  // Unified Feed: Sort all logs by timestamp, newest first
   const sortedLogs = [...logs].sort((a, b) => b.timestamp - a.timestamp);
-  const myLogs = sortedLogs.filter(l => l.userId === userId || l.userId === 'SHARED');
-  const partnerLogs = sortedLogs.filter(l => (l.userId !== userId && l.userId !== 'SHARED') || l.userId === 'SHARED');
 
   return (
-    <div className="h-[100dvh] p-0 flex flex-col max-w-md md:max-w-2xl mx-auto relative overflow-hidden">
+    <div className="h-[100dvh] flex flex-col max-w-md md:max-w-2xl mx-auto relative overflow-hidden bg-transparent">
       <BackgroundDoodles />
       
       {isSpaceActive ? (
@@ -440,16 +439,15 @@ const App: React.FC = () => {
           </div>
       ) : (
       <>
-        {/* Header */}
-        <header className="relative z-20 bg-white/90 backdrop-blur-sm pt-safe-top pb-2 px-4 shadow-sm border-b-2 border-green-100 shrink-0 rounded-b-2xl">
-            <div className="flex justify-between items-center mb-4 pt-2">
+        {/* Header - Locked Location */}
+        <header className="fixed top-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md pt-safe-top pb-3 px-4 shadow-md border-b-2 border-green-100 max-w-md md:max-w-2xl mx-auto rounded-b-2xl">
+            <div className="flex justify-between items-center mb-3 pt-1">
                 <div className="flex items-center gap-2">
                     <div className="bg-green-100 p-1.5 rounded-lg border-2 border-green-200">
                         <Sprout className="text-green-600 w-5 h-5" />
                     </div>
                     <div>
                         <h1 className="font-bold text-lg leading-none text-gray-800">LoveSync</h1>
-                        <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider">{!roomData.guestId ? 'Waiting for partner' : 'Connected'}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -461,11 +459,11 @@ const App: React.FC = () => {
             {/* Batteries Row */}
             {roomData.guestId && (
                 <div className="flex gap-2">
-                     <div className={`flex-1 p-2 rounded-xl border-2 transition-all ${activeTab === 'me' ? 'bg-white border-green-400 shadow-sm' : 'bg-gray-50 border-transparent opacity-60'}`}>
+                     <div className="flex-1 p-2 rounded-xl border-2 border-green-200 bg-white shadow-sm">
                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Me</p>
                          <SocialBattery level={myState.socialBattery || 80} onUpdate={handleBatteryUpdate} />
                      </div>
-                     <div className={`flex-1 p-2 rounded-xl border-2 transition-all ${activeTab === 'partner' ? 'bg-white border-green-400 shadow-sm' : 'bg-gray-50 border-transparent opacity-60'}`}>
+                     <div className="flex-1 p-2 rounded-xl border-2 border-gray-100 bg-gray-50/50">
                          <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">{partnerName}</p>
                          <SocialBattery level={partnerState.socialBattery || 80} readOnly={true} />
                      </div>
@@ -473,53 +471,23 @@ const App: React.FC = () => {
             )}
         </header>
 
-        {/* Tab Switcher */}
-        <nav className="relative z-20 flex px-4 pt-4 shrink-0">
-            <button 
-                onClick={() => setActiveTab('me')}
-                className={`flex-1 pb-3 text-center font-bold text-lg transition-colors border-b-4 select-none touch-manipulation ${activeTab === 'me' ? 'border-black text-black' : 'border-transparent text-gray-400/70'}`}
-            >
-                My Journal
-            </button>
-            <button 
-                onClick={() => setActiveTab('partner')}
-                className={`flex-1 pb-3 text-center font-bold text-lg transition-colors border-b-4 select-none touch-manipulation ${activeTab === 'partner' ? 'border-black text-black' : 'border-transparent text-gray-400/70'}`}
-            >
-                {partnerName}
-            </button>
-        </nav>
-
-        {/* Main Content Feed */}
-        <main className="flex-1 flex flex-col relative z-10 min-h-0">
-            {activeTab === 'me' ? (
-                <div className="flex-1 overflow-y-auto px-4 py-6 pb-safe-area-plus-24 space-y-6 overscroll-contain">
-                    {myLogs.length === 0 ? (
-                         <div className="text-center mt-10 p-8 bg-white/60 backdrop-blur-sm rounded-3xl border-2 border-dashed border-gray-300">
-                             <h3 className="text-xl font-bold text-gray-500 mb-2 font-[Patrick_Hand]">Your journal is empty</h3>
-                             <p className="text-gray-400 text-sm font-bold">Tap the + button to log how you feel.</p>
-                         </div>
-                    ) : (
-                        myLogs.map(log => (
-                            <MoodCard key={log.id} data={log} isMe={log.userId === userId} isShared={log.userId === 'SHARED'} />
-                        ))
-                    )}
-                </div>
+        {/* Main Content Feed - With padding for fixed header */}
+        <main className="flex-1 overflow-y-auto px-4 py-4 pt-36 pb-32 space-y-6 overscroll-contain relative z-10 w-full">
+            {sortedLogs.length === 0 ? (
+                 <div className="text-center mt-20 p-8 bg-white/60 backdrop-blur-sm rounded-3xl border-2 border-dashed border-gray-300">
+                     <h3 className="text-xl font-bold text-gray-500 mb-2 font-[Patrick_Hand]">Your garden is empty</h3>
+                     <p className="text-gray-400 text-sm font-bold">Tap + to plant the first seed.</p>
+                 </div>
             ) : (
-                <div className="flex-1 overflow-y-auto px-4 py-6 pb-safe-area-plus-24 space-y-6 overscroll-contain">
-                    {!roomData.guestId ? (
-                        <div className="mt-10 p-6 bg-yellow-50/90 rounded-2xl border-2 border-yellow-200 text-center shadow-sm">
-                            <p className="font-bold text-yellow-800">Share code <span className="font-mono bg-white px-1 rounded">{roomCode}</span> to connect.</p>
-                        </div>
-                    ) : partnerLogs.length === 0 ? (
-                        <div className="text-center mt-10 p-8 bg-white/60 backdrop-blur-sm rounded-3xl border-2 border-dashed border-gray-300">
-                             <h3 className="text-xl font-bold text-gray-500 mb-2 font-[Patrick_Hand]">No updates yet</h3>
-                             <p className="text-gray-400 text-sm font-bold">{partnerName} hasn't posted anything.</p>
-                        </div>
-                    ) : (
-                        partnerLogs.map(log => (
-                            <MoodCard key={log.id} data={log} isMe={false} isShared={log.userId === 'SHARED'} />
-                        ))
-                    )}
+                sortedLogs.map(log => (
+                    <MoodCard key={log.id} data={log} isMe={log.userId === userId} isShared={log.userId === 'SHARED'} />
+                ))
+            )}
+            
+            {/* Connection Prompt at bottom if alone */}
+            {!roomData.guestId && (
+                 <div className="mt-4 p-4 bg-yellow-50/90 rounded-2xl border-2 border-yellow-200 text-center shadow-sm">
+                    <p className="font-bold text-yellow-800 text-sm">Share code <span className="font-mono bg-white px-1 rounded mx-1">{roomCode}</span> to connect.</p>
                 </div>
             )}
         </main>
@@ -527,7 +495,7 @@ const App: React.FC = () => {
       )}
 
       {/* Interaction Modals & Overlays */}
-      {activeTab === 'me' && myState.pendingInteraction && !amITakingSpace && !isSpaceActive && (
+      {myState.pendingInteraction && !amITakingSpace && !isSpaceActive && (
           <InteractionModal interaction={myState.pendingInteraction} onDismiss={handleDismissInteraction} />
       )}
       {sentInteractionData && <SentFeedbackModal type={sentInteractionData.type} partnerName={sentInteractionData.partnerName} onClose={() => setSentInteractionData(null)} />}
@@ -561,7 +529,7 @@ const App: React.FC = () => {
       {/* Menu Modal */}
       {isMenuOpen && (
         <MenuModal 
-          type={activeTab}
+          type="me" // Unified type
           partnerName={partnerName}
           onClose={() => setIsMenuOpen(false)}
           onOpenMoodEditor={() => { setIsMenuOpen(false); setIsEditing(true); }}

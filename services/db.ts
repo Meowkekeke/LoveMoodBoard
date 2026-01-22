@@ -86,7 +86,7 @@ export const subscribeToRoom = (code: string, callback: (data: RoomData | null) 
   });
 };
 
-export const logMood = async (code: string, userId: string, userName: string, mood: Mood | null, note: string, actionConfig?: { category: 'self_care'|'rough'|'needs', icon: string }): Promise<string> => {
+export const logMood = async (code: string, userId: string, userName: string, mood: Mood | null, note: string, actionConfig?: { category: 'rough'|'needs', icon: string }): Promise<string> => {
   const roomRef = doc(db, ROOM_COLLECTION, code);
   
   const entryId = crypto.randomUUID();

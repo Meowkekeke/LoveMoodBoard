@@ -1,3 +1,4 @@
+
 export enum Mood {
   // Positive
   HAPPY = 'happy',
@@ -50,7 +51,7 @@ export interface MoodEntry {
   userName: string;
   type: 'mood' | 'action' | 'conversation'; // Added 'conversation'
   mood?: Mood; // Only for type 'mood'
-  category?: 'self_care' | 'rough' | 'needs'; // Only for type 'action'
+  category?: 'rough' | 'needs'; // Removed self_care
   icon?: string; // Icon identifier for actions
   note: string; // For conversations, this is the topic
   messages?: ChatMessage[]; // For archived conversations
@@ -138,32 +139,6 @@ export interface ActionItem {
 }
 
 export const ACTION_CATEGORIES = {
-  self_care: {
-    label: 'Self Care',
-    color: 'bg-green-100 border-green-300',
-    items: [
-      { id: 'meditation', label: 'Meditation', icon: 'Flower', color: 'text-pink-500' },
-      { id: 'walk', label: 'Walk', icon: 'Footprints', color: 'text-orange-600' },
-      { id: 'yoga', label: 'Yoga', icon: 'Activity', color: 'text-purple-600' },
-      { id: 'gym', label: 'Gym', icon: 'Dumbbell', color: 'text-slate-600' },
-      { id: 'read', label: 'Read', icon: 'BookOpen', color: 'text-blue-600' },
-      { id: 'painting', label: 'Painting', icon: 'Palette', color: 'text-red-500' },
-      { id: 'hydrate', label: 'Hydrate', icon: 'Droplet', color: 'text-cyan-500' },
-    ]
-  },
-  rough: {
-    label: 'Rough',
-    color: 'bg-red-50 border-red-200',
-    items: [
-      { id: 'bad_meeting', label: 'Bad Meeting', icon: 'Briefcase', color: 'text-red-600' },
-      { id: 'no_sleep', label: 'No Sleep', icon: 'Moon', color: 'text-indigo-600' },
-      { id: 'tired', label: 'Just Tired', icon: 'BatteryLow', color: 'text-orange-500' },
-      { id: 'poorly', label: 'Felt Poorly', icon: 'Frown', color: 'text-gray-600' },
-      { id: 'anxious', label: 'Anxious', icon: 'Wind', color: 'text-blue-400' },
-      { id: 'sick', label: 'Feeling Sick', icon: 'Thermometer', color: 'text-red-500' },
-      { id: 'other', label: 'Other', icon: 'Edit3', color: 'text-gray-500' },
-    ]
-  },
   needs: {
     label: 'Needs',
     color: 'bg-purple-50 border-purple-200',
@@ -173,6 +148,19 @@ export const ACTION_CATEGORIES = {
       { id: 'sleep_early', label: 'Sleep Early', icon: 'MoonStar', color: 'text-indigo-500' },
       { id: 'help', label: 'House Help', icon: 'Home', color: 'text-orange-600' },
       { id: 'listen', label: 'Listen', icon: 'Ear', color: 'text-amber-600' },
+    ]
+  },
+  rough: {
+    label: 'Rough Time',
+    color: 'bg-red-50 border-red-200',
+    items: [
+      { id: 'bad_meeting', label: 'Bad Meeting', icon: 'Briefcase', color: 'text-red-600' },
+      { id: 'no_sleep', label: 'No Sleep', icon: 'Moon', color: 'text-indigo-600' },
+      { id: 'tired', label: 'Just Tired', icon: 'BatteryLow', color: 'text-orange-500' },
+      { id: 'poorly', label: 'Felt Poorly', icon: 'Frown', color: 'text-gray-600' },
+      { id: 'anxious', label: 'Anxious', icon: 'Wind', color: 'text-blue-400' },
+      { id: 'sick', label: 'Feeling Sick', icon: 'Thermometer', color: 'text-red-500' },
+      { id: 'other', label: 'Other', icon: 'Edit3', color: 'text-gray-500' },
     ]
   }
 };
